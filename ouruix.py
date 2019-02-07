@@ -551,10 +551,10 @@ bob.forward(1)
         print(self.init_code)
 
         try:
-            #            tree = ast.parse(self.init_code)
-            #            Tracer2().visit(tree)
-            #            ast.fix_missing_locations(tree)
-            #            self.init_code_compiled = compile(tree, '<code-input>', 'exec')
+           # tree = ast.parse(self.init_code)
+           # Tracer2().visit(tree)
+           # ast.fix_missing_locations(tree)
+           # self.init_code_compiled = compile(tree, '<code-input>', 'exec')
 
             if self.run_to_cursor:
                 print("ROW:", self.init_editor.cursor_row)
@@ -571,64 +571,20 @@ bob.forward(1)
             print('* ' * 40)
             exc_type, exc_obj, exc_tb = exc_info()
             line_num = None
-            #            print(44, exc_tb.tb_frame.f_code.co_filename, exc_tb.tb_lineno)
+            # print(44, exc_tb.tb_frame.f_code.co_filename, exc_tb.tb_lineno)
             if hasattr(exc_obj, 'lineno'
                        ):  #exc_type and issubclass(exc_type, SyntaxError):
                 print('exc_obj', exc_obj.lineno, exc_obj.filename)
                 line_num = exc_obj.lineno
 
             while exc_tb:
-                #                print(55, exc_tb.tb_lineno, exc_tb.tb_frame.f_code.co_filename)
+                #  print(55, exc_tb.tb_lineno, exc_tb.tb_frame.f_code.co_filename)
                 if exc_tb.tb_frame.f_code.co_filename == '<code-input>':
                     line_num = exc_tb.tb_lineno
                 exc_tb = exc_tb.tb_next
 
             self.init_editor.highlight_line(line_num)
 
-#            fname = exc_tb.tb_frame.f_code.co_filename
-#            print(333, exc_tb.tb_lineno, fname)
-#            self.init_editor._highlight_line = exc_tb.tb_lineno # line_num #exc_info()[2].tb_lineno
-
-#            etype, value, tb = exc_info()
-#            texc = traceback.TracebackException(exc_type, exc_obj, exc_tb, limit=None)
-#            print('00', list(texc.format_exception_only()))
-##            print(77, list(texc.format(chain=True)))
-#            print(88, texc.stack)
-#            print(99, ''.join(texc.stack.format()))
-#            line_num = None
-#            for fs in reversed(texc.stack):
-#                print(44, repr(fs.filename))
-#                if fs.filename == '<code-input>':
-#                    line_num = fs.lineno
-#                    break
-#            print('line_num', line_num)
-#            for s in reversed(traceback.extract_stack()):
-#                print(55, s)
-#            print(66, traceback.format_exc())
-#            print(333, self.init_editor._highlight_line)
-#            print(self.init_editor) #e)
-#            print(type(self.init_editor))
-#            print(exc_info()[2].tb_lineno)
-#            traceback.print_stack()
-#            tb = exc_info()[2]
-#            print(22, tb, tb.tb_next)
-#            while tb:
-#                print('1111', tb, tb.tb_lineno, tb.tb_frame.f_code.co_filename, tb.tb_frame.f_lineno)
-#                tb = tb.tb_next
-##            stack = traceback.extract_stack()[:-1]  # last one would be full_stack()
-##            if exc is not None:  # i.e. an exception is present
-##                del stack[-1]       # remove call of full_stack, the printed exception
-##                                    # will contain the caught exception caller instead
-#            trc = 'Traceback (most recent call last):\n'
-#            stackstr = '' # trc + ''.join(traceback.format_list(stack))
-##            if tb is not None:
-#            stackstr += '  ' + traceback.format_exc().lstrip(trc)
-#            print(2222, stackstr)
-##            print(traceback.format_exc())
-#            print(exc.tb_frame.f_lineno)
-#            print(exc)
-#            print(exc.tv)
-#            print(dir(self.init_editor))
         else:
             self.init_editor.highlight_line(None)
             self.trigger_exec_init()
@@ -648,38 +604,19 @@ bob.forward(1)
         seed(123)
         try:
             exec(self.init_code_compiled, self._globals, None)
-            #self._globals.update(globals())
-            #self._globals.update(locals())
-#            cons_out = ''
-#            for k, v in globals().copy().items():
-#                print(123, k, type(v), repr(v)[:50])
-#                if any([isinstance(v, t) for t in [int, float, str, dict, tuple]]) and k[0] != '_':
-#                    #print(k, type(v), repr(v)[:80], sep='\t')
-#                    cons_out += k + '\t' + repr(v)[:80] + '\n'
-#            self.console = cons_out
-#            print('cons_out', cons_out)
-
-#            self.sandbox.points = self.sandbox.turtles[-1]._points
-#            self.sandbox.ball.pos = tuple(self.sandbox.turtles[0]._position)
 
         except Exception as e:
-            #            cons_out = ''
-            #            for k, v in globals().copy().items():
-            #                if any([isinstance(v, t) for t in [int, float, str, dict, tuple]]) and k[0] != '_':
-            #                    #print(k, type(v), repr(v)[:80], sep='\t')
-            #                    cons_out += k + '\t' + repr(v)[:80] + '\n'
-            #            self.console = cons_out
             print(e)
             exc_type, exc_obj, exc_tb = exc_info()
             line_num = None
-            #            print(44, exc_tb.tb_frame.f_code.co_filename, exc_tb.tb_lineno)
+            # print(44, exc_tb.tb_frame.f_code.co_filename, exc_tb.tb_lineno)
             if hasattr(exc_obj, 'lineno'
                        ):  #exc_type and issubclass(exc_type, SyntaxError):
                 print('exc_obj', exc_obj.lineno, exc_obj.filename)
                 line_num = exc_obj.lineno
 
             while exc_tb:
-                #                print(55, exc_tb.tb_lineno, exc_tb.tb_frame.f_code.co_filename)
+                #  print(55, exc_tb.tb_lineno, exc_tb.tb_frame.f_code.co_filename)
                 if exc_tb.tb_frame.f_code.co_filename == '<code-input>':
                     line_num = exc_tb.tb_lineno
                 exc_tb = exc_tb.tb_next
@@ -717,24 +654,14 @@ bob.forward(1)
 
     def execute_run(self, *largs):
         self.steps += 1
-        # glob = self._globals #globals()
-        # glob.update(self.vars)
-        #        glob['goto'] = self.sandbox.goto
-        #        glob['prpos'] = self.sandbox.prpos
-        # glob['steps'] = self.steps
         self._globals.update(self.vars)
         self._globals['steps'] = self.steps
-        #        glob['a'] = self.var_a
-        #        glob['b'] = self.var_b
-        #        glob['m'] = self.var_m
-        #        glob['n'] = self.var_n
+
         try:
-            #exec(init_code, glob)
+            # exec(init_code, glob)
             # exec(self.run_code_compiled, glob)
             exec(self.run_code_compiled, self._globals, None)
 
-
-#            exec(self.run_code, glob)
         except Exception as e:
             print(e)
         else:
