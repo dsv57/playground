@@ -1,0 +1,232 @@
+#:kivy 1.0
+#:import Vector kivy.vector.Vector
+
+<Ball>:
+    size: 25, 25
+    canvas:
+        Color:
+            rgb: 0.7, 0.2, 0.9
+        Ellipse:
+            pos: self.pos
+            size: 25, 25
+
+<OurSandbox>:
+    ball: ball
+    #scale: 0.5
+    scale_min: 0.05
+    scale_max: 10
+    do_rotation: False
+    auto_bring_to_front: False
+#    canvas:
+#        Color:
+#            rgb: .4, .4, 1
+#        Line:
+#            points: self.points
+#            joint: 'round'
+#            cap: 'round'
+#            width: 5
+    
+    Ball:
+        id: ball
+        center: self.parent.center
+
+<VarSlider>:
+    #pos_hint: {'top': 1}
+
+    size_hint_y: None
+    height: '32dp'
+    rows: 1
+    
+    TextInput:
+        id: var
+        text: root.var_name
+        on_text: root.var_name = args[1]
+        input_filter: lambda ss, fu: root._filter_var(self, ss, fu)
+        size_hint: None, None
+        height: '32dp'
+        #width: '64dp' if len(self.text) < 7 else '64dp'
+        width: '48dp' if len(self.text) < 4 else str(24*int(len(self.text)/2.2))+'dp'
+        #width: self.texture_size[0] + dp(24)
+        multiline: False
+    Label:
+        text: ' = ' + root._str(root.value)
+        text_size: self.width, None
+        size_hint: None, None
+        height: '32dp'
+        width: '64dp'
+    TextInput:
+        text: str(root.min)
+        on_text: root.min = root._to_numtype(args[1])
+        # input_filter: root.type
+        size_hint: None, None
+        height: '32dp'
+        width: '48dp' 
+        multiline: False
+    Slider:
+        value: root.value
+        on_value: root.value = root._to_numtype(args[1])
+        min: root.min
+        max: root.max
+        step: root.step
+        height: '32dp'
+        size_hint: 1, None
+    TextInput:
+        text: str(root.max)
+        on_text: root.max = root._to_numtype(args[1])
+        # input_filter: root.type
+        size_hint: None, None
+        height: '32dp'
+        width: '48dp'
+        multiline: False
+        
+<Playground>:
+    sandbox: sandbox.__self__
+    init_editor: init_editor
+    rpanel: rpanel
+    #run_to_cursor: run_to_cursor
+    #console: textout
+
+    BoxLayout:
+        Splitter:
+            id: editor_pane
+            sizable_from: 'right'
+            vertical: 1
+            size_hint: (None, 1)
+            min_size: 300
+            width: 450
+
+            Accordion:
+                orientation: 'vertical'
+                
+                AccordionItem:
+                    title: 'Initialization'
+                    collapse: False
+                    BoxLayout:
+                        orientation: 'vertical'
+
+            
+        #               #ScrollView: https://github.com/kivy/kivy/issues/1449
+                        CodeEditor:
+                            id: init_editor
+                            style: 'monokai'
+                            text: root.init_code
+                            on_text: root.init_code = args[1]
+                            auto_indent: True
+                            background_color: 0.153, 0.157, 0.133, 1
+                            cursor_width: '2sp'
+                            size_hint_y: 0.75
+                            cursor_color: (1, 1, 1, 1)
+
+                        ToggleButton:
+                            #id: run_to_cursor
+                            on_state: root.run_to_cursor = self.state=='down'
+                            size_hint_y: None
+                            height: '48dp'
+                            text: 'Run to cursor'
+
+                        #background_color: 1, 1, 0.9, 1
+                        #        size_hint_y: None
+                        #        height: self.minimum_height
+        #                Button:
+        #                    text: "AAAAAAAAAAAA!!!"
+        #                Button:
+        #                    text: "BABABABAA!!!"
+        #                Button:
+        #                    text: "AAAAAAAAAAAA!!!"
+        #                Button:
+        #                    text: "BABABABAA!!!"
+        #                CodeEditor:    
+        #                    orientation: 'horizontal'
+        #                    size_hint: 1, 1
+        #                    ScrollView:
+        #                        id: scrlv
+        #                        bar_width: 10
+        #                        scroll_type: ['bars', 'content']
+        #                        size_hint: 0.2, 0.2
+        #                        bar_inactive_color: self.bar_color        
+        #                    CodeInput:
+        #                        id: ti
+        #                        text: root.init_code
+        #                        on_text: root.init_code = args[1]
+        #                        font_size: 23
+        #                        size_hint: 1, None
+        #                        height: max(self.minimum_height, scrlv.height)
+        #                        on_cursor_row: self.parent.change_scroll_y(ti, scrlv)
+        
+                AccordionItem:
+                    title: 'Run'
+                    collapse: True
+                    CodeEditor:
+                        text: root.run_code
+                        on_text: root.run_code = args[1]
+                        style: 'monokai'
+                        auto_indent: True
+                        background_color: 0.153, 0.157, 0.133, 1
+                        cursor_width: '2sp'
+    
+        BoxLayout:
+            #orientation: 'vertical'
+            #orientation: 'horizontal'
+            orientation: 'horizontal' if root.width >= 1024 else 'vertical'
+            
+            MapViewer:
+                OurSandbox:
+                    id: sandbox
+                    min_size: 200
+                    pos: Vector(self.parent.size)*0.5+Vector(self.parent.pos)
+                    size_hint: (.6, None) if self.width < self.height else (None, .6)
+    
+            Splitter:
+                id: sandbox_pane
+                sizable_from: 'top' if self.vertical else 'left'
+                vertical: 0 if root.width >= 1024 else 1
+                #size_hint: (.3,.7)
+                size_hint: (1, .5) if self.vertical else (.5, 1)
+                min_size: 200
+                #width: 200
+                    
+                GridLayout:
+                    id: rpanel
+                    pos_hint: {'top': 1}
+                    cols: 1
+                    spacing: 5
+                    padding: 5
+                    #size_hint_y: None
+                    #height: self.minimum_height
+
+                    #min_size: 300
+                    #orientation: 'vertical'
+
+#                    VarSlider:
+#                        type: 'float'
+#                        var_name: 'x'
+#                        on_value: print
+ #                   VarSlider:
+ #                       type: 'float'
+#                        step: 0.001
+#                        var_name: 'b'
+
+#                    VarSlider:
+#                        var_name: 'm'
+#                    VarSlider:
+#                        var_name: 'n'
+                                                
+                    Label:
+                        id: textout
+                        font_name: '/usr/lib/python3/dist-packages/kivy/data/fonts/RobotoMono-Regular.ttf'
+                        #text_size: self.size, None
+                        text_size: self.width, self.height
+                        size: self.texture_size
+                        padding: mm(3), mm(3)
+                        valign: 'top'
+                        text: root.console
+                        size_hint_y: 1
+
+                        
+                    #GridLayout:
+                     #   cols: 5
+                      #  size_hint_y: 1 # 0.25
+            
+
+            
+    
