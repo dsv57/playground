@@ -27,6 +27,33 @@ from pymunk.vec2d import Vec2d
 from named_colors import COLORS
 
 
+from kivy.uix.image import Image
+
+
+class Sprite(Scatter):
+    # filename: str=None,
+    # scale: float=1,
+    # image_x: float=0, image_y: float=0,
+    # image_width: float=0, image_height: float=0,
+    # center_x: float=0, center_y: float=0,
+    # repeat_count_x=1, repeat_count_y=1
+
+    # img, x=0, y=0,
+    # blend_src=GL_SRC_ALPHA,
+    # blend_dest=GL_ONE_MINUS_SRC_ALPHA,
+    # batch=None,
+    # group=None,
+    # usage='dynamic',
+    # subpixel=False
+
+    def __init__(self,
+                 image, x=0, y=0, scale=1, **kwargs):
+        super(Sprite, self).__init__()
+        imag = Image(source=image)
+        root.add_widget(imag, size=imag.size)
+
+
+
 class Turtle:
     _instances = set()
     _shapes = {
