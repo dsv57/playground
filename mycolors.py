@@ -193,12 +193,25 @@ def show_cam16ucs_hues():
 #    update()
 
 # NCS
+#ncs = eval(open('/home/user/edu/colour/ncs-final-int').read())
 #colormode(255)
 #for cc in [x for x in ncs if x[0].split('-')[0] == '2050']:
 #    c = lab_to_cam16ucs(*cc[1][-1])
 #    goto(c[1] * 10, c[2] * 10)
 #    dot(20, 'black')
 #    dot(10, cc[1][0])
+# chrom = 20
+# for blackness in range(5, 80+1, 5):
+#     for cc in [x for x in ncs if x[0].split('-')[0] == f'{blackness:02}{chrom}']:
+#         a = int(cc[0].split('-')[1][1:3] or '0')
+#         if a not in [0, 30, 50, 70]:
+#             continue
+#         c = lab_to_cam16ucs(cc[1][-1])
+#         angle = atan2(c[2], c[1])
+#         r = c[0]
+#         goto(r*cos(angle), r*sin(angle))
+#         dot(6, [c/255 for c in cc[1][0]])
+
 
 #colormode(255)
 #for h in hues[::2]:
