@@ -5,14 +5,14 @@ from random import random, randint, uniform, choice, seed
 #from numpy import sin, cos, arctan2, sqrt, ceil, floor, degrees, radians, log, pi, exp
 from math import sin, cos, atan2, sqrt, ceil, floor, degrees, radians, log, pi, exp
 from copy import deepcopy
-from sys import exc_info
+# from sys import exc_info
 import re
 
 # Code analysis
 # import sys  # for sys.path (autocomp)
 import ast
-import jedi
-from sys import getsizeof
+# import jedi
+# from sys import getsizeof
 from collections import defaultdict
 
 from kivy.uix.textinput import FL_IS_LINEBREAK
@@ -32,63 +32,38 @@ from kivy.properties import StringProperty, NumericProperty, \
         OptionProperty, DictProperty
 from kivy.clock import Clock
 
+import pymunk
+
 from ourturtle import Turtle, Vec2d
+from sprite import Sprite
+from codean import autocomp, CodeRunner, COMMON_CODE
+
 
 try:
     import mycolors
 except:
     pass
 
-# Code An
-_MAX_VAR_SIZE = 4096
-jedi.settings.add_bracket_after_function = True
-jedi.settings.case_insensitive_completion = False
-jedi.preload_module('ourturtle')
+# # Code An
+# _MAX_VAR_SIZE = 4096
+# jedi.settings.add_bracket_after_function = True
+# jedi.settings.case_insensitive_completion = False
+# jedi.preload_module('ourturtle')
 
 
-def autocomp(src, namespace, lineno, column):
-    return jedi.Interpreter(
-        'from ourturtle import Turtle\n' + src, [namespace],
-        line=lineno + 1 + 1,
-        column=column).completions()
+# def autocomp(src, namespace, lineno, column):
+#     return jedi.Interpreter(
+#         'from ourturtle import Turtle\n' + src, [namespace],
+#         line=lineno + 1 + 1,
+#         column=column).completions()
 
-
-# Дамп _до_ каждой строчки
-class Tracer2(ast.NodeTransformer):
-    def __init__(self, **kvargs):
-        self._lines_done = []
-        super(Tracer2, self).__init__(**kvargs)
-
-    def visit(self, node):
-        def tracer_ast(lineno):
-            return ast.Expr(
-                value=ast.Call(
-                    func=ast.Name(id='_dump_vars', ctx=ast.Load()),
-                    args=[
-                        ast.Call(
-                            func=ast.Name(id='locals', ctx=ast.Load()),
-                            args=[],
-                            keywords=[]),
-                        ast.Num(n.lineno)
-                    ],
-                    keywords=[]))
-
-        if hasattr(node, 'body'):
-            new_body = []
-            prev_lineno = -1
-            for i, n in enumerate(node.body):
-                if n.lineno not in self._lines_done and n.lineno > prev_lineno:
-                    self._lines_done.append(n.lineno)
-                    prev_lineno = n.lineno
-                    new_body.append(tracer_ast(n.lineno))
-                new_body.append(n)
-            node.body = new_body
-        return self.generic_visit(node)
+# https://github.com/kivy/kivy/wiki/Working-with-Python-threads-inside-a-Kivy-application
 
 
 class CodeEditor(CodeInput):
     def __init__(self, **kwargs):
         self._highlight_line = None
+        self.namespace = {}
         self.ac_begin = False
         self.ac_current = 0
         self.ac_position = None
@@ -211,11 +186,11 @@ class CodeEditor(CodeInput):
                         self.ac_begin = True
                         self.ac_position = self.cursor
                         self.ac_current = 0
-                #print('ac:', self.ac_state, self.ac_completions)
+                # print('ac:', self.ac_state, self.ac_completions)
                 if self.ac_completions:
                     ac = self.ac_completions[self.ac_current]
                     self.insert_text(ac.complete)
-                    #self.ac_state[2] = len(ac.complete)
+                    # self.ac_state[2] = len(ac.complete)
             return True
         self.ac_begin = False
         super(CodeInput, self).keyboard_on_key_down(window, keycode, text,
@@ -270,29 +245,10 @@ class VarSlider(GridLayout):
 
 
 class OurSandbox(ScatterPlane):
-    ball = ObjectProperty(None)
-
-    #    points = ListProperty([90, -30, 0, 70])
-    #    turtles = []
 
     def __init__(self, **kwargs):
-        # self.turtles = []
         super(OurSandbox, self).__init__(**kwargs)
-
-    # def add_turtle(self):
-    #     t = Turtle()
-    #     self.turtles.append(t)
-    #     return t
-#    def goto(self, x, y):
-#        r = self.ball.size[0]
-#        self.ball.pos = (x-r/2, y-r/2)
-#        self.points.append((x, y))
-#        if len(self.points) > 70:
-#            self.points.pop(0)
-#
-#    def prpos(self):
-#        print('POS:', self.ball.pos)
-#        return self.ball.pos
+        self.space = pymunk.Space()
 
     def on_touch_down(self, touch):
         if touch.is_mouse_scrolling:
@@ -352,13 +308,19 @@ bob = Turtle()
 bob.color('yellow')
 bob.left(45)
 bob.forward(90)
+def update():
+  print(123)
+  bob.left(1)
+  bob.forward(1)
+  bob.right(2)
+  128907
 ''')
-    run_code = StringProperty('''
-#x, y = t.pos()
-#t.goto(300*sin(steps/(4)), 300*cos(steps/5))
-bob.left(1)
-bob.forward(1)
-''')
+#     run_code = StringProperty('''
+# #x, y = t.pos()
+# #t.goto(300*sin(steps/(4)), 300*cos(steps/5))
+# #bob.left(1)
+# #bob.forward(1)
+# ''')
 
     #    var_a = NumericProperty(0.5)
     #    var_b = NumericProperty(0.5)
@@ -373,29 +335,23 @@ bob.forward(1)
     rpanel = ObjectProperty(None)
     run_to_cursor = BooleanProperty(False)
 
-    init_code_compiled = None
-    run_code_compiled = None
+    # _code_compiled = None
+    # run_code_compiled = None
 
     #    ball = ObjectProperty(None)
-
-    def add_turtle_instance(self):
-        turtle = Turtle()  # self.sandbox.add_turtle()
-        self._the_turtle = turtle
-        for v in dir(turtle):
-            if v[0] != '_':
-                self._globals[v] = getattr(turtle, v)
 
     def __init__(self, **kwargs):
         super(Playground, self).__init__(**kwargs)
         #        self.test_canvas = RenderContext()
         #        s = self.test_canvas.shader
+
         self._run_vars = None
 
-        self._globals = dict()
+        globs = dict()
         for v in 'random randint uniform choice seed sin cos atan2 \
                 sqrt ceil floor degrees radians log pi exp'.split(
         ):
-            self._globals[v] = eval(v)
+            globs[v] = eval(v)
 
         def _dump_vars(v, lineno):
             global _vars
@@ -406,20 +362,26 @@ bob.forward(1)
                     self._run_vars[lineno][k].append(
                         v if getsizeof(v) <= _MAX_VAR_SIZE else '<LARGE>')
 
-        self._globals['_dump_vars'] = _dump_vars
-        self._globals['Turtle'] = Turtle  # self.sandbox.add_turtle
-        self.add_turtle_instance()
+        globs['Turtle'] = Turtle  # self.sandbox.add_turtle
         try:
-            self._globals['cam16ucs_to_srgb'] = mycolors.cam16ucs_to_srgb
-            self._globals['jzazbz_to_srgb'] = mycolors.jzazbz_to_srgb
-            self._globals['srgb_to_cam16ucs'] = mycolors.srgb_to_cam16ucs
-            #for v in dir(mycolors):
-            #    if v[0] != '_':
-            #        self._globals[v] = getattr(mycolors, v)
+            globs['cam16ucs_to_srgb'] = mycolors.cam16ucs_to_srgb
+            globs['jzazbz_to_srgb'] = mycolors.jzazbz_to_srgb
+            globs['srgb_to_cam16ucs'] = mycolors.srgb_to_cam16ucs
+            globs['lab_to_cam16ucs'] = mycolors.lab_to_cam16ucs
+            # for v in dir(mycolors):
+            #     if v[0] != '_':
+            #         self._globals[v] = getattr(mycolors, v)
         except:
             pass
 
-        self.init_editor.namespace = self._globals
+        self.runner = CodeRunner(globals=globs, special_funcs=['update'])
+
+        # self.sandbox.add_widget(Sprite('images/simple_cv_joint_animated.gif'))  # orc.gif
+        # self.sandbox.add_widget(Sprite('images/bird.zip')) #orc.gif
+        # self.sandbox.add_widget(Sprite('images/cube.zip')) #orc.gif
+        self.sandbox.add_widget(Sprite('turtle'))
+
+        self.init_editor.namespace = self.runner.globals # FIXME
 
         vs1 = VarSlider(var_name='a', type='float')
         vs2 = VarSlider(var_name='b', type='float')
@@ -434,19 +396,16 @@ bob.forward(1)
         self.rpanel.add_widget(vs5, 1)
         self.rpanel.add_widget(vs6, 1)
 
-        #        self._globals = {}
         self.steps = 0
-        self.trigger_exec_init = Clock.create_trigger(self.execute_init, -1)
-        self.bind(init_code=self.compile_init)
-        self.bind(run_to_cursor=self.compile_init)
+        self.trigger_exec = Clock.create_trigger(self.execute_code, -1)
+        self.bind(init_code=self.compile_code)
+        self.bind(run_to_cursor=self.compile_code)
         self.init_editor.bind(cursor_row=self.on_init_editor_cursor_row)
-
-        #        self.bind(var_a=self.trigger_exec_init)
-        #        self.bind(var_b=self.trigger_exec_init)
 
         def _set_var(wid, value):
             self.vars[wid.var_name] = value
-            self.trigger_exec_init()
+            if wid.var_name in self.runner.common_vars:
+                self.trigger_exec()
 
         vs1.bind(value=_set_var)
         vs2.bind(value=_set_var)
@@ -461,24 +420,34 @@ bob.forward(1)
         vs5.value = 50
         vs6.value = 75
 
-        #        self.bind(var_m=self.trigger_exec_init)
-        #        self.bind(var_n=self.trigger_exec_init)
-        self.compile_init()
+        #        self.bind(var_m=self.trigger_exec)
+        #        self.bind(var_n=self.trigger_exec)
+        self.compile_code()
 
         self.graphics_instructions = []
-        self.bind(run_code=self.compile_run)
-        self.compile_run()
+        # self.bind(run_code=self.compile_run)
+        # self.compile_run()
         self.trigger_exec_run = Clock.create_trigger(self.execute_run, -1)
         self.run_schedule = None  # Clock.schedule_interval(self.trigger_exec_run, 1.0 / 60.0)
 
     def on_init_editor_cursor_row(self, *largs):
         if self.run_to_cursor:
-            self.compile_init()
+            self.compile_code()
 
     def update_sandbox(self, redraw=True):
         if redraw:
             self.graphics_instructions = []
+            # self.sandbox.canvas.clear()
+
+            # Clear the Right Way (Thank you Mark Vasilkov)
+            saved = self.sandbox.children[:]
+            self.sandbox.clear_widgets()
             self.sandbox.canvas.clear()
+            self.sandbox.space.remove(*self.sandbox.space.shapes)
+            self.sandbox.space.remove(*self.sandbox.space.bodies)
+            for widget in saved:
+                self.sandbox.add_widget(widget)
+
             with self.sandbox.canvas:
                 for t in Turtle.turtles():
                     for color, width, points in t._lines:
@@ -515,6 +484,9 @@ bob.forward(1)
                     Color(*t._pencolor)
                     Triangle(points=[0, -10, 30, 0, 0, 10])
                     PopMatrix()
+                # for s in Sprite._instances:
+                #     s.draw()
+                    # self.sandbox.add_widget(s)
         else:
             i = 0
             instrs = len(self.graphics_instructions)
@@ -545,124 +517,104 @@ bob.forward(1)
                         i += 1
             # print("STATS:", instrs, st_ch, st_n)
 
-    def compile_init(self, *largs):
+    def compile_code(self, *largs):
         #        self._run_vars = defaultdict(lambda: defaultdict(list))
-        print('= ' * 40)
-        print(self.init_code)
+        # print('= ' * 40)
+        # print(self.init_code)
+
+        # if self.run_schedule:
+        #     Clock.unschedule(self.run_schedule)
+
+        breakpoint = None
+        if self.run_to_cursor:
+            breakpoint = self.init_editor.cursor_row + 2
 
         try:
-           # tree = ast.parse(self.init_code)
-           # Tracer2().visit(tree)
-           # ast.fix_missing_locations(tree)
-           # self.init_code_compiled = compile(tree, '<code-input>', 'exec')
-
-            if self.run_to_cursor:
-                print("ROW:", self.init_editor.cursor_row)
-                tree = ast.Module([
-                    node for node in ast.parse(self.init_code).body
-                    if node.lineno <= self.init_editor.cursor_row
-                ])
-                self.init_code_compiled = compile(tree, '<code-input>', 'exec')
-            else:
-                self.init_code_compiled = compile(self.init_code,
-                                                  '<code-input>', 'exec')
+            changed = self.runner.parse(self.init_code, breakpoint)
+            # print('changed:', changed)
+            if COMMON_CODE in changed:
+                self.runner.reset()
+            self.runner.compile(changed)
         except Exception as e:
-            print(e)
+            print('E:', e)
             print('* ' * 40)
-            exc_type, exc_obj, exc_tb = exc_info()
-            line_num = None
-            # print(44, exc_tb.tb_frame.f_code.co_filename, exc_tb.tb_lineno)
-            if hasattr(exc_obj, 'lineno'
-                       ):  #exc_type and issubclass(exc_type, SyntaxError):
-                print('exc_obj', exc_obj.lineno, exc_obj.filename)
-                line_num = exc_obj.lineno
-
-            while exc_tb:
-                #  print(55, exc_tb.tb_lineno, exc_tb.tb_frame.f_code.co_filename)
-                if exc_tb.tb_frame.f_code.co_filename == '<code-input>':
-                    line_num = exc_tb.tb_lineno
-                exc_tb = exc_tb.tb_next
-
+            line_num = self.runner.exception_lineno(e)
             self.init_editor.highlight_line(line_num)
-
         else:
             self.init_editor.highlight_line(None)
-            self.trigger_exec_init()
+            if COMMON_CODE in changed:
+                self.trigger_exec()
+                changed.remove(COMMON_CODE)
+            try:
+                self.runner.execute(changed)
+            except Exception as e:
+                print('E3:', e)
 
-    def execute_init(self, *largs):
-        if not self.init_code_compiled:
-            return
-#        init_code = self.init_code
-#        run_code = self.run_code
 
-#        print('-->', init_code)
-
-        self._globals.update(self.vars)
+    def execute_code(self, *largs):
+        self.runner.set_globals(self.vars, False)
         Turtle.clear_turtles()
-        self.add_turtle_instance()
-        self._run_vars = defaultdict(lambda: defaultdict(list))
+        Sprite.clear_sprites()
+
+        turtle = Turtle()  # self.sandbox.add_turtle()
+        self._the_turtle = turtle
+        for v in dir(turtle):
+            if v[0] != '_':
+                self.runner.globals[v] = getattr(turtle, v)
+
+        # self._run_vars = defaultdict(lambda: defaultdict(list))
         seed(123)
         try:
-            exec(self.init_code_compiled, self._globals, None)
+            self.runner.execute()
 
         except Exception as e:
-            print(e)
-            exc_type, exc_obj, exc_tb = exc_info()
-            line_num = None
-            # print(44, exc_tb.tb_frame.f_code.co_filename, exc_tb.tb_lineno)
-            if hasattr(exc_obj, 'lineno'
-                       ):  #exc_type and issubclass(exc_type, SyntaxError):
-                print('exc_obj', exc_obj.lineno, exc_obj.filename)
-                line_num = exc_obj.lineno
-
-            while exc_tb:
-                #  print(55, exc_tb.tb_lineno, exc_tb.tb_frame.f_code.co_filename)
-                if exc_tb.tb_frame.f_code.co_filename == '<code-input>':
-                    line_num = exc_tb.tb_lineno
-                exc_tb = exc_tb.tb_next
+            print('E2:', e)
+            line_num = self.runner.exception_lineno(e)
 
             self.init_editor.highlight_line(line_num)
+            if self.run_schedule:
+                Clock.unschedule(self.run_schedule)
 
         else:
+
+            out = self.runner.text_stream.getvalue()
+            print('out:', out)
+            print('- ' * 40)
+
             #            pass
             self.init_editor.highlight_line(None)
             # FIXME: add scene spdiff
             self.update_sandbox()
-            if self.run_schedule:
-                Clock.unschedule(self.run_schedule)
-            self.run_schedule = Clock.schedule_interval(
-                self.trigger_exec_run, 1.0 / 30.0)
 
-            #Ellipse(pos=t._position - 0.5*Vec2d(size, size), size=(size, size))
+            for k, v in self.runner.globals.items():
+                if any([isinstance(v, t) for t in [int, float, str, dict, tuple]]) and k[0] != '_':
+                    print(k, type(v), repr(v)[:80], sep='\t')
+            print('= ' * 40)
 
-#        last_line = max(self._run_vars.keys())[-1]
-#        print(33333, _run_vars[last_line])
-#        cons_out = ''
-#        for k, vs in _run_vars[last_line].items():
-#            v = vs[-1]
-#            if any([isinstance(v, t) for t in [int, float, str, dict, tuple]]) and k[0] != '_':
-#                #print(k, type(v), repr(v)[:80], sep='\t')
-#                cons_out += k + '\t' + repr(v)[:80] + '\n'
-#        self.console = cons_out
+            if 'update' in self.runner.globals:
+                self.run_schedule = Clock.schedule_interval(self.trigger_exec_run, 1.0 / 60.0)
 
-    def compile_run(self, *largs):
-        try:
-            self.run_code_compiled = compile(self.run_code, '<run-code-input>',
-                                             'exec')
-        except:
-            pass  # FIXME
+    # def compile_run(self, *largs):
+    #     try:
+    #         self.runner.compile(['update'])
+    #     except:
+    #         pass  # FIXME
 
     def execute_run(self, *largs):
         self.steps += 1
-        self._globals.update(self.vars)
-        self._globals['steps'] = self.steps
+        self.runner.globals.update(self.vars)
+        self.runner.globals['steps'] = self.steps
+        ts_pos = self.runner.text_stream.tell()
 
         try:
-            # exec(init_code, glob)
-            # exec(self.run_code_compiled, glob)
-            exec(self.run_code_compiled, self._globals, None)
+            self.runner.call_if_exists('update')
 
         except Exception as e:
             print(e)
+
         else:
             self.update_sandbox(False)
+
+        self.runner.text_stream.seek(ts_pos)
+        print(self.runner.text_stream.read())
+        print('* ' * 20)

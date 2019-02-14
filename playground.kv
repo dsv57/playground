@@ -11,7 +11,7 @@
             size: 25, 25
 
 <OurSandbox>:
-    ball: ball
+#    ball: ball
     #scale: 0.5
     scale_min: 0.05
     scale_max: 10
@@ -26,9 +26,9 @@
 #            cap: 'round'
 #            width: 5
     
-    Ball:
-        id: ball
-        center: self.parent.center
+#    Ball:
+#        id: ball
+#        center: self.parent.center
 
 <VarSlider>:
     #pos_hint: {'top': 1}
@@ -153,16 +153,16 @@
         #                        height: max(self.minimum_height, scrlv.height)
         #                        on_cursor_row: self.parent.change_scroll_y(ti, scrlv)
         
-                AccordionItem:
-                    title: 'Run'
-                    collapse: True
-                    CodeEditor:
-                        text: root.run_code
-                        on_text: root.run_code = args[1]
-                        style: 'monokai'
-                        auto_indent: True
-                        background_color: 0.153, 0.157, 0.133, 1
-                        cursor_width: '2sp'
+        #       AccordionItem:
+        #           title: 'Run'
+        #           collapse: True
+        #           CodeEditor:
+        #               text: root.run_code
+        #               on_text: root.run_code = args[1]
+        #               style: 'monokai'
+        #               auto_indent: True
+        #               background_color: 0.153, 0.157, 0.133, 1
+        #               cursor_width: '2sp'
     
         BoxLayout:
             #orientation: 'vertical'
