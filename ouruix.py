@@ -17,6 +17,7 @@ from collections import defaultdict
 
 from kivy.uix.textinput import FL_IS_LINEBREAK
 
+from kivy.uix.behaviors import FocusBehavior
 from kivy.uix.codeinput import CodeInput
 from kivy.uix.widget import Widget
 from kivy.uix.stencilview import StencilView
@@ -31,6 +32,7 @@ from kivy.properties import StringProperty, NumericProperty, \
         ListProperty, ObjectProperty, BooleanProperty, \
         OptionProperty, DictProperty
 from kivy.clock import Clock
+from kivy.core.window import Window # request keyboard
 
 import pymunk
 
@@ -45,6 +47,10 @@ except:
     pass
 
 # https://github.com/kivy/kivy/wiki/Working-with-Python-threads-inside-a-Kivy-application
+
+F_UPDATE = 'update'
+F_ON_KEY_PRESS = 'on_key_press'
+F_ON_KEY_RELEASE = 'on_key_release'
 
 
 class CodeEditor(CodeInput):
@@ -231,11 +237,42 @@ class VarSlider(GridLayout):
 #        super(CodeEditor, self).__init__(**kwargs)
 
 
-class OurSandbox(ScatterPlane):
+class OurSandbox(FocusBehavior, ScatterPlane):
 
     def __init__(self, **kwargs):
         super(OurSandbox, self).__init__(**kwargs)
         self.space = pymunk.Space()
+        self._keyboard = None
+
+        # self._keyboard = Window.request_keyboard(
+        #     self._keyboard_closed, self, 'text')
+        # if self._keyboard.widget:
+        #     pass
+        # self._keyboard.bind(on_key_down=self.on_key_down, on_key_up=self.on_key_up)
+        # print(dir(ScatterPlane))
+
+    # def on_focus(self, instance, value, *largs):
+    #     print('Touch')
+    #     if not self._keyboard:
+    #         self._keyboard = Window.request_keyboard(
+    #             self._keyboard_closed, self, 'text')
+    #         if self._keyboard.widget:
+    #             pass
+    #     self._keyboard.bind(on_key_down=self.on_key_down, on_key_up=self.on_key_up)
+
+    def _keyboard_closed(self):
+        print('UNBIND')
+        self._keyboard.unbind(on_key_down=self.on_key_down, on_key_up=self.on_key_up)
+        self._keyboard = None
+
+    def on_key_down(self, keyboard, keycode, text, modifiers):
+        print('DOWN', keycode[1] or text, modifiers)
+        return True
+
+    def on_key_up(self, keyboard, keycode, *args):
+        # print('UP', chr(keycode[0]), args)
+        return True
+
 
     def on_touch_down(self, touch):
         if touch.is_mouse_scrolling:
@@ -365,7 +402,7 @@ def update():
 
         self.init_editor.namespace = self.runner.globals # FIXME
 
-        vs1 = VarSlider(var_name='a', type='float')
+        vs1 = VarSlider(var_name='a', min=0, max=360, type='float')
         vs2 = VarSlider(var_name='b', type='float')
         vs3 = VarSlider(var_name='c', type='float')
         vs4 = VarSlider(var_name='l', min=0, max=50)

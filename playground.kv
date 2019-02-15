@@ -95,34 +95,37 @@
             min_size: 300
             width: 450
 
-            Accordion:
-                orientation: 'vertical'
+        #    Accordion:
+        #        orientation: 'vertical'
                 
-                AccordionItem:
-                    title: 'Initialization'
-                    collapse: False
-                    BoxLayout:
-                        orientation: 'vertical'
+        #        AccordionItem:
+        #            title: 'Initialization'
+        #            collapse: False
+        #            BoxLayout:
+        #                orientation: 'vertical'
 
             
         #               #ScrollView: https://github.com/kivy/kivy/issues/1449
-                        CodeEditor:
-                            id: init_editor
-                            style: 'monokai'
-                            text: root.init_code
-                            on_text: root.init_code = args[1]
-                            auto_indent: True
-                            background_color: 0.153, 0.157, 0.133, 1
-                            cursor_width: '2sp'
-                            size_hint_y: 0.75
-                            cursor_color: (1, 1, 1, 1)
+            BoxLayout:
+                orientation: 'vertical'
 
-                        ToggleButton:
-                            #id: run_to_cursor
-                            on_state: root.run_to_cursor = self.state=='down'
-                            size_hint_y: None
-                            height: '48dp'
-                            text: 'Run to cursor'
+                CodeEditor:
+                    id: init_editor
+                    style: 'monokai'
+                    text: root.init_code
+                    on_text: root.init_code = args[1]
+                    auto_indent: True
+                    background_color: 0.153, 0.157, 0.133, 1
+                    cursor_width: '2sp'
+                    size_hint_y: 0.75
+                    cursor_color: (1, 1, 1, 1)
+
+                ToggleButton:
+                    #id: run_to_cursor
+                    on_state: root.run_to_cursor = self.state=='down'
+                    size_hint_y: None
+                    height: '48dp'
+                    text: 'Run to cursor'
 
                         #background_color: 1, 1, 0.9, 1
                         #        size_hint_y: None
