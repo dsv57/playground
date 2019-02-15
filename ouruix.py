@@ -44,19 +44,6 @@ try:
 except:
     pass
 
-# # Code An
-# _MAX_VAR_SIZE = 4096
-# jedi.settings.add_bracket_after_function = True
-# jedi.settings.case_insensitive_completion = False
-# jedi.preload_module('ourturtle')
-
-
-# def autocomp(src, namespace, lineno, column):
-#     return jedi.Interpreter(
-#         'from ourturtle import Turtle\n' + src, [namespace],
-#         line=lineno + 1 + 1,
-#         column=column).completions()
-
 # https://github.com/kivy/kivy/wiki/Working-with-Python-threads-inside-a-Kivy-application
 
 
@@ -309,11 +296,11 @@ bob.color('yellow')
 bob.left(45)
 bob.forward(90)
 def update():
-  print(123)
-  bob.left(1)
+  # print(123)
+  bob.setheading(a)
   bob.forward(1)
-  bob.right(2)
-  128907
+  # bob.right(2)
+  # 128907
 ''')
 #     run_code = StringProperty('''
 # #x, y = t.pos()
@@ -335,15 +322,10 @@ def update():
     rpanel = ObjectProperty(None)
     run_to_cursor = BooleanProperty(False)
 
-    # _code_compiled = None
-    # run_code_compiled = None
-
     #    ball = ObjectProperty(None)
 
     def __init__(self, **kwargs):
         super(Playground, self).__init__(**kwargs)
-        #        self.test_canvas = RenderContext()
-        #        s = self.test_canvas.shader
 
         self._run_vars = None
 
@@ -362,7 +344,7 @@ def update():
                     self._run_vars[lineno][k].append(
                         v if getsizeof(v) <= _MAX_VAR_SIZE else '<LARGE>')
 
-        globs['Turtle'] = Turtle  # self.sandbox.add_turtle
+        globs['Turtle'] = Turtle
         try:
             globs['cam16ucs_to_srgb'] = mycolors.cam16ucs_to_srgb
             globs['jzazbz_to_srgb'] = mycolors.jzazbz_to_srgb
@@ -420,8 +402,6 @@ def update():
         vs5.value = 50
         vs6.value = 75
 
-        #        self.bind(var_m=self.trigger_exec)
-        #        self.bind(var_n=self.trigger_exec)
         self.compile_code()
 
         self.graphics_instructions = []
@@ -531,9 +511,9 @@ def update():
 
         try:
             changed = self.runner.parse(self.init_code, breakpoint)
-            # print('changed:', changed)
             if COMMON_CODE in changed:
                 self.runner.reset()
+
             self.runner.compile(changed)
         except Exception as e:
             print('E:', e)
@@ -545,6 +525,7 @@ def update():
             if COMMON_CODE in changed:
                 self.trigger_exec()
                 changed.remove(COMMON_CODE)
+            print('EXEC Changed', changed)
             try:
                 self.runner.execute(changed)
             except Exception as e:
@@ -594,11 +575,6 @@ def update():
             if 'update' in self.runner.globals:
                 self.run_schedule = Clock.schedule_interval(self.trigger_exec_run, 1.0 / 60.0)
 
-    # def compile_run(self, *largs):
-    #     try:
-    #         self.runner.compile(['update'])
-    #     except:
-    #         pass  # FIXME
 
     def execute_run(self, *largs):
         self.steps += 1
@@ -616,5 +592,7 @@ def update():
             self.update_sandbox(False)
 
         self.runner.text_stream.seek(ts_pos)
-        print(self.runner.text_stream.read())
-        print('* ' * 20)
+        out = self.runner.text_stream.read()
+        if out:
+            print(out)
+            print('* ' * 20)

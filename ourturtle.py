@@ -152,7 +152,7 @@ class Turtle:
     def setheading(self, deg):
         # self._orient = Vec2d(1, 0)
         # self._rotate(deg)
-        self._orient.angle_degrees(deg)
+        self._orient.angle_degrees = deg
 
     def zlevel(self, z=None):
         if z:
