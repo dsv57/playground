@@ -51,9 +51,9 @@ def compare_ast(node1, node2):
         return False
     if isinstance(node1, ast.AST):
         for k, v in vars(node1).items():
-            if k in ('lineno', 'col_offset', 'ctx'):
+            if k in ('lineno', 'col_offset', 'ctx', '_pp', '_precedence', '_use_parens', '_p_op'):
                 continue
-            if not compare_ast(v, getattr(node2, k)):
+            if not compare_ast(v, getattr(node2, k, None)):
                 return False
         return True
     elif isinstance(node1, list):
@@ -242,16 +242,19 @@ class CodeRunner:
 
     def compile(self, parts=None, **kvargs):
         codeobjs = self._codeobjs
-        for p in parts or self._ast.keys():
+        if parts is None:
+            parts = self._ast.keys()
+        for p in parts:
             codeobjs[p] = compile(self._ast[p], self._name, 'exec', **kvargs)
 
     def execute(self, parts=None):
         if self.text_stream.closed:
             self.text_stream = StringIO()
         cobjs = self._codeobjs
-        if not parts:  # Preserving order: common first.
+        if parts is None:  # Preserving order: common first.
             parts = [COMMON_CODE] + list(set(cobjs.keys()) - set([COMMON_CODE]))
         for p in parts:
+            print('exec', p)
             try:
                 with redirect_stdout(self.text_stream):
                     with redirect_stderr(self.text_stream):
