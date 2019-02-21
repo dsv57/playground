@@ -37,7 +37,7 @@ from kivy.core.window import Window # request keyboard
 import pymunk
 
 from ourturtle import Turtle, Vec2d
-from sprite import Sprite
+from sprite import Sprite, OurImage
 from codean import autocomp, CodeRunner, COMMON_CODE
 
 
@@ -105,21 +105,20 @@ class CodeEditor(CodeInput):
         padding_left = self.padding[0]
         padding_right = self.padding[2]
         x = self.x
-        canvas_add = self.canvas.add
         highlight_color = (.9, .1, .1, .3)
         # value = _lines[line_num]
         if miny <= y <= maxy + dy:
             r = rects[line_num]
             draw_highlight(r.pos, r.size, line_num, _lines, _get_text_width,
                            tab_width, _label_cached, width, padding_left,
-                           padding_right, x, canvas_add, highlight_color)
+                           padding_right, x, highlight_color)
         y -= dy
         self._position_handles('both')
 
     def _draw_highlight(self, *largs):
         pos, size, line_num,\
             _lines, _get_text_width, tab_width, _label_cached, width,\
-            padding_left, padding_right, x, canvas_add, selection_color = largs
+            padding_left, padding_right, x, selection_color = largs
         # Draw the current selection on the widget.
         x, y = pos
         w, h = size
@@ -135,8 +134,8 @@ class CodeEditor(CodeInput):
             return
         x1 = max(x1, x)
         x2 = min(x2, x + width_minus_padding)
-        canvas_add(Color(*selection_color, group='highlight'))
-        canvas_add(
+        self.canvas.add(Color(*selection_color, group='highlight'))
+        self.canvas.add(
             Rectangle(
                 pos=(x1, pos[1]), size=(x2 - x1, size[1]), group='highlight'))
 
@@ -149,6 +148,7 @@ class CodeEditor(CodeInput):
     def keyboard_on_key_down(self, window, keycode, text, modifiers):
         # print('keyboard_on_key_down', keycode, text, modifiers)
         key, key_str = keycode
+        print('kk', keycode)
         if key == 9:  # Tab
             cc, cr = self.cursor
             _lines = self._lines
@@ -260,6 +260,18 @@ class OurSandbox(FocusBehavior, ScatterPlane):
     #             pass
     #     self._keyboard.bind(on_key_down=self.on_key_down, on_key_up=self.on_key_up)
 
+    def keyboard_on_key_down(self, window, keycode, text, modifiers):
+        '''We call super before doing anything else to enable tab cycling
+        by FocusBehavior. If we wanted to use tab for ourselves, we could just
+        not call it, or call it if we didn't need tab.
+        '''
+        print('DOWN2', keycode[1] or text, modifiers)
+        if super(OurSandbox, self).keyboard_on_key_down(window, keycode,
+                                                         text, modifiers):
+            return True
+        #self.text = keycode[1]
+        return True
+
     def _keyboard_closed(self):
         print('UNBIND')
         self._keyboard.unbind(on_key_down=self.on_key_down, on_key_up=self.on_key_up)
@@ -319,26 +331,48 @@ class MapViewer(StencilView):
 
 class Playground(FloatLayout):
 
-    init_code = StringProperty('''#penup()
 #for i in range(10*n):
 #    pensize(i/50)
 #    color(sin(i/m)/2+0.5,cos(i/m)/2+0.5,b/10+1)
 #    goto(300*sin(i/(a*5)), 300*cos(i/15))
 #    pendown()
-forward(100)
-right(45)
-forward(70)
-bob = Turtle()
-bob.color('yellow')
-bob.left(45)
-bob.forward(90)
+# forward(100)
+# right(45)
+# forward(70)
+# bob = Turtle()
+# bob.color('yellow')
+# bob.left(45)
+# bob.forward(390)
+# bob.pensize(3)
+
+# im = cam16.from_xyz100(srgb.to_xyz100(srgb.from_srgb1(image.reshape((image.shape[0] * image.shape[1], 3)).T)))[[True, True,False,True,False,False,False]].T.reshape(image.shape)
+# im[...,2] += a
+# im[...,2] %= 400
+# image_sr = srgb.to_srgb1(srgb.from_xyz100(cam16.to_xyz100(im.reshape((image.shape[0] * image.shape[1], 3)).T,'JCh'))).T
+# img.set_image(image_sr)
+# im = img.imc16.copy()
+
+    init_code = StringProperty('''#penup()
+
+import numpy as np
+im = np.array([img.imc16[...,0].T, img.imc16[...,5].T, img.imc16[...,3].T]).T
+
+im[...,2] += a
+im[...,2] %= 360
+im[...,1] *= b
+im[...,0] *= c
+img.set_imc16(im, 'Jsh')
+
 def update():
-  # print(123)
-  bob.setheading(a)
-  bob.forward(1)
+  pass
+
+''')
+
+      # print(123)
+  # bob.setheading(a)
+  # bob.forward(1)
   # bob.right(2)
   # 128907
-''')
 #     run_code = StringProperty('''
 # #x, y = t.pos()
 # #t.goto(300*sin(steps/(4)), 300*cos(steps/5))
@@ -357,6 +391,7 @@ def update():
     sandbox = ObjectProperty(None)
     init_editor = ObjectProperty(None)
     rpanel = ObjectProperty(None)
+    textout = ObjectProperty(None)
     run_to_cursor = BooleanProperty(False)
 
     #    ball = ObjectProperty(None)
@@ -383,6 +418,7 @@ def update():
 
         globs['Turtle'] = Turtle
         try:
+            globs['cam16_to_srgb'] = mycolors.cam16_to_srgb
             globs['cam16ucs_to_srgb'] = mycolors.cam16ucs_to_srgb
             globs['jzazbz_to_srgb'] = mycolors.jzazbz_to_srgb
             globs['srgb_to_cam16ucs'] = mycolors.srgb_to_cam16ucs
@@ -393,14 +429,21 @@ def update():
         except:
             pass
 
-        self.runner = CodeRunner(globals=globs, special_funcs=['update'])
 
         # self.sandbox.add_widget(Sprite('images/simple_cv_joint_animated.gif'))  # orc.gif
         # self.sandbox.add_widget(Sprite('images/bird.zip')) #orc.gif
         # self.sandbox.add_widget(Sprite('images/cube.zip')) #orc.gif
         self.sandbox.add_widget(Sprite('turtle'))
+        img = OurImage(source='grace_hopper.jpg')
+        globs['image'] = img.image
+        # self.sandbox.add_widget(img)
+        globs['img'] = img
 
-        self.init_editor.namespace = self.runner.globals # FIXME
+
+        self.runner = CodeRunner(globals=globs, special_funcs=['update'])
+
+
+        self.init_editor.namespace = self.runner.globals # FIXME?
 
         vs1 = VarSlider(var_name='a', min=0, max=360, type='float')
         vs2 = VarSlider(var_name='b', type='float')
@@ -570,7 +613,9 @@ def update():
 
 
     def execute_code(self, *largs):
-        self.runner.set_globals(self.vars, False)
+        print('execute_code')
+        self.runner.reset(globals=self.vars)
+        # self.runner.set_globals(self.vars, False)
         Turtle.clear_turtles()
         Sprite.clear_sprites()
 
@@ -596,6 +641,7 @@ def update():
         else:
 
             out = self.runner.text_stream.getvalue()
+            self.textout.text = out
             print('out:', out)
             print('- ' * 40)
 

@@ -4,6 +4,7 @@ from math import *
 from random import *
 from os import stat
 from filecmp import _sig as file_sig
+from collections import OrderedDict
 import pickle
 # import hashlib
 
@@ -28,6 +29,8 @@ from kivy.core.window import Window
 # from kivy.core.image import Image as CoreImage
 from kivy.properties import StringProperty, NumericProperty, \
     ListProperty, ObjectProperty, AliasProperty
+
+import numpy as np # OurImage
 
 import pymunk
 import pymunk.autogeometry
@@ -194,6 +197,263 @@ def draw_pymunk_shape(canvas, shape, color=None):
                 shape.kivy = Line(points=points)
 
 
+import numpy as np
+from numpy import sin, cos, arctan2 as atan2, \
+                  sqrt, ceil, floor, degrees, radians, log, pi, exp, transpose
+from colorio import CIELAB, CAM16UCS, CAM16, JzAzBz, SrgbLinear
+from colorio.illuminants import whitepoints_cie1931
+
+L_A = 64 / pi / 5
+srgb = SrgbLinear()
+lab = CIELAB()
+cam16 = CAM16(0.69, 20, L_A)
+cam16ucs = CAM16UCS(0.69, 20, L_A)
+
+
+class Colors:
+
+    def __init__(self, colors=None, description='sRGB', **kwargs):
+        #self.cam16 = CAM16(0.69, 20, L_A)
+        c = kwargs.get('c', 0.69)
+        Y_b = kwargs.get('Y_b', 20)
+        L_A = kwargs.get('L_A', 64 / pi / 5)
+        exact_inversion = kwargs.get('exact_inversion', True)
+        whitepoint = kwargs.get('whitepoint', 'D65')
+        if isinstance(whitepoint, str):
+            whitepoint = whitepoints_cie1931[whitepoint]
+
+        cam16ucs = CAM16UCS(c, Y_b, L_A, exact_inversion, whitepoint)
+        cam16 = cam16ucs.cam16
+        self._cam16ucs = cam16ucs
+        self._cam16 = cam16
+        self._srgb = SrgbLinear()
+        self._srgb_colors = None
+        self._original_colors = None
+        self._dimensions = 'Jsh'
+
+        if colors:
+            self.set(colors, description)
+
+    def reset(self):
+        self._colors = self._original_colors.copy()        
+
+    def set(self, colors, description='sRGB'):
+        cam16ucs = self._cam16ucs
+        cam16 = cam16ucs.cam16
+        if isinstance(colors, str):
+            colors = [colors]
+        if isinstance(colors, bytes): #'Image' in globals() and isinstance(colors, (Image, CoreImage, Texture)):
+            # if isinstance(colors, CoreImage):
+            #     texture = colors.texture
+            # elif isinstance(colors, Image):
+            #     texture = colors._coreimage.texture
+            # else:
+            #     texture = colors
+            width, height = texture.size
+            length = len(colors) // 4
+            image_srgb = np.fromstring(colors, dtype='ubyte').reshape(length, 4)[...,:3].astype('float') / 255
+            image_flat_srgb = image_srgb.reshape((length, 3)).T
+
+            colors = image_flat_srgb
+            # self._rgb_image = image
+            self._srgb_colors = image.reshape((length, 3)).T
+        elif isinstance(colors, list):
+            # self._size = (len(colors),)
+            self._srgb_colors = None
+            if isinstance(colors[0], (tuple, list)):
+                if all([all([isinstance(c, int) for c in cc]) and len(cc) == 3 for cc in colors]):
+                    colors = np.array(colors).astype('float')
+                    if description == 'sRGB':
+                        colors /= 255
+                elif all([all([isinstance(c, float) for c in cc]) and len(cc) == 3 for cc in colors]):
+                    colors = np.array(colors)
+                else:
+                    raise Exception('bad colors list')
+            elif isinstance(colors[0], str) and description == 'sRGB':
+                colors_srgb = []
+                for color in colors:
+                    if color.startswith('#'):
+                        if len(color) == 7:
+                            colors_srgb.append([int(color[i:i + 2], 16) / 255 for i in (1, 3, 5)])
+                        elif len(color) == 4:
+                            colors_srgb.append([16 * int(h, 16) / 255 for h in color[1:]])
+                    elif color in COLORS:
+                        colors_srgb.append(COLORS[color])
+                    else:
+                        raise Exception('bad colors list')
+                colors = np.array(colors_srgb).astype('float') / 255
+            else:
+                raise Exception('bad colors list')
+        else:
+            raise Exception('bad colors list')
+
+        colors = np.transpose(colors)
+        if description == 'sRGB':
+            xyz = srgb.to_xyz100(srgb.from_srgb1(colors))
+        elif description == 'CIELAB':
+            xyz = CIELAB().to_xyz100(colors)
+        elif description == 'CIELUV':
+            xyz = CIELUV().to_xyz100(colors)
+        elif description == 'CIELCH':
+            xyz = CIELCH().to_xyz100(colors)
+        elif description == 'XYZ':
+            xyz = colors
+        elif description[0] in 'JQ' and description[1] in 'CMs' and description[2] in 'Hh':
+            xyz = cam16.to_xyz100(colors, description)
+        elif description in ['CAM16UCS', 'CAM16-UCS']:
+            xyz = cam16ucs.to_xyz100(colors)
+
+        self._xyz = xyz
+        self._colors = cam16.from_xyz100(xyz)
+        if not self._original_colors:
+            self._original_colors = self._colors.copy()
+
+
+    @property
+    def lightness(self):
+        return self._colors[0]
+
+    @property
+    def chroma(self):
+        return self._colors[1]
+
+    @property
+    def hue_quadrature(self):
+        return self._colors[2]
+
+    @property
+    def hue(self):
+        return self._colors[3]
+
+    @property
+    def colorfulness(self):
+        return self._colors[4]
+
+    @property
+    def saturation(self):
+        return self._colors[5]
+
+    @property
+    def brightness(self):
+        return self._colors[6]
+
+    _dims = {
+        'lightness': ('J', 0, 0),
+        'brightness': ('Q', 6, 0),
+        'chroma': ('C', 1, 1),
+        'colorfulness': ('M', 4, 1),
+        'saturation': ('s', 5, 1),
+        'hue quadrature': ('H', 2, 2),
+        'hue': ('h', 3, 2),
+    }
+    _dims_ltr = {  #{_dims[d][0]: _dims[d][1:]+(d,) for d in _dims}
+        'J': (0, 0, 'lightness'),
+        'Q': (6, 0, 'brightness'),
+        'C': (1, 1, 'chroma'),
+        'M': (4, 1, 'colorfulness'),
+        's': (5, 1, 'saturation'),
+        'H': (2, 2, 'hue quadrature'),
+        'h': (3, 2, 'hue')
+    }
+
+    def _select_dims(self, ds):
+        # J, C, H, h, M, s, Q
+        if isinstance(ds, str) and len(ds) == 3 and ds[0] in 'JQ' and ds[1] in 'CMs' and ds[2] in 'Hh':
+            return ds
+
+        dims = Colors._dims
+        dims_ltr = Colors._dims_ltr
+        dstr = list(self._dimensions)
+        if isinstance(ds, str) and ds in dims:
+            ds = [ds]
+        if isinstance(ds, list):
+            for d in ds:
+                if len(d) == 1:
+                    ltr = d
+                    dim_n = dims_ltr[d][0]
+                else:
+                    ltr, _, dim_n = dims.get(d)
+                dstr[dim_n] = ltr
+        else:
+            for ltr in ds:
+                dim_n = dims_ltr[ltr][0]
+                dstr[dim_n] = ltr
+
+        self._dimensions = ''.join(dstr)
+        return dstr
+
+
+    def set_dimension(self, dimension, value, preserve=None):
+        if len(dimension) == '1':
+            dim = Colors._dims_ltr[ltr][0]
+        else:
+            dim = Colors._dims[dimension][1]
+        self._colors[dim] = value
+        if preserve:
+            self._select_dims(preserve)
+        self._select_dims(dimension)
+
+
+    def get_something(self):
+        srgb = self._srgb
+        colors = self._colors
+        length = len(colors)
+        srgb_colors = srgb.to_srgb1(srgb.from_xyz100(cam16.to_xyz100(im.reshape((length, 3)).T, self._dimensions))).T # JCh
+        self._srgb_colors = srgb_colors.clip(0, 1, srgb_colors)
+        return srgb_colors
+        
+
+    # J, C, H, h, M, s, Q = cam16.from_xyz100(xyz)
+    # JQ CMs Hh
+
+    # self.K_L = 1.0
+    # self.c1 = 0.007
+    # self.c2 = 0.0228
+    # params = {
+    #     "LCD": (0.77, 0.007, 0.0053),
+    #     "SCD": (1.24, 0.007, 0.0363),
+    #     "UCS": (1.00, 0.007, 0.0228),
+    # }
+
+
+class OurImage(Image):
+
+    #image = NumericProperty()
+
+    def __init__(self, **kwargs):
+        super(OurImage, self).__init__(**kwargs)
+        texture = self._coreimage.texture
+        self.reference_size = texture.size
+        self.texture = texture
+        image = np.fromstring(self.texture.pixels, dtype='ubyte').reshape(*texture.size, 4)[...,:3].astype('float') / 255
+        self._image = image
+        width, height = texture.size
+        # self.imc16 = cam16.from_xyz100(srgb.to_xyz100(srgb.from_srgb1(image.reshape((image.shape[0] * image.shape[1], 3)).T)))[[True, True,False,True,False,False,False]].T.reshape(image.shape)
+        image_flat_rgb = image.reshape((width * height, 3)).T
+        image_flat_cam16 = cam16.from_xyz100(srgb.to_xyz100(srgb.from_srgb1(image_flat_rgb)))
+        J, C, H, h, M, s, Q = image_flat_cam16.T.reshape(width, height, 7).T
+        self.imc16 = image_flat_cam16.T.reshape(width, height, 7)
+
+    def _get_image(self):
+        return self._image.copy()
+
+    def _set_image(self, image):
+        #print('on_image ' * 30)
+        buf = (image * 255).flatten().astype('ubyte')
+        self.texture.blit_buffer(buf, colorfmt='rgb', bufferfmt='ubyte')
+
+    image = AliasProperty(_get_image, _set_image)
+
+    def set_image(self, image):
+        print('on_image ' * 30)
+        buf = (image * 255).flatten().astype('ubyte')
+        self.texture.blit_buffer(buf, colorfmt='rgb', bufferfmt='ubyte')
+
+    def set_imc16(self, im, descr='JCh'):
+        image_sr = srgb.to_srgb1(srgb.from_xyz100(cam16.to_xyz100(im.reshape((self.image.shape[0] * self.image.shape[1], 3)).T, descr))).T # JCh
+        self.set_image(image_sr.clip(0, 1))
+
+
 class Sprite(Scatter):
 
     _instances = set()
@@ -230,13 +490,14 @@ class Sprite(Scatter):
         }
     }
 
-    space = ObjectProperty(None)
+    # space = ObjectProperty(None)
 
     def __init__(self, source, x=0, y=0, scale=1, **kwargs):
         super(Sprite, self).__init__()
 
         self.body = pymunk.Body(body_type=pymunk.Body.KINEMATIC)
 
+        self.space = None
         self.source = source
         self.bottom_left = (0, 0)
         if source not in self._shapes:
@@ -318,12 +579,15 @@ class Sprite(Scatter):
     #         for shape in self._shapes:
     #             self.add_widget(shape)
     def on_parent(self, instance, value):
-        print('on_parent', instance, value)
-        if value and value is not Sprite.space:
-            Sprite.space = self.parent.space
+        # print('on_parent', instance, value)
+        # if value: print('...', value.space, self.space, self.space and self.space.shapes, self.pymunk_shapes)
+        if value: # FIXME FIXME FIXME and value.space is not self.space:
+            self.space = value.space
             for shape in self.pymunk_shapes:
-                print("OP", shape)
-                Sprite.space.add(shape)
+                # print("OP", shape)
+                # print('SHapes:', self.space.shapes)
+                if shape not in self.space.shapes:
+                    self.space.add(shape) # FIXME: AssertionError: shape already added to space
         # return super().on_parent(instance, value)
 
     def collide_point(self, x, y):
@@ -338,6 +602,7 @@ class Sprite(Scatter):
     def on_position(self, instance, position):
         print('On position', position)
         self.position = position
+        # print('ON POS', self.space, self.space and self.space.shapes, self.pymunk_shapes)
         # self.body.position = position # self.to_parent(*pos)
         # if self.space:
         #     self.space.reindex_shapes_for_body(self.body)
@@ -408,8 +673,11 @@ class Sprite(Scatter):
 
     @staticmethod
     def clear_sprites():
+        print('CLEAR ' * 20)
         for sprite in Sprite._instances:
-            Sprite.space.remove(*sprite.pymunk_shapes)
+            if sprite.space:
+                sprite.space.remove(*sprite.pymunk_shapes)
+            # Sprite.space.remove(*sprite.pymunk_shapes)
         # TODO: Remove bodies
         Sprite._instances = set()
 
