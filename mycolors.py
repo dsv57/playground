@@ -4,11 +4,12 @@
 import numpy as np
 from numpy import sin, cos, arctan2 as atan2, \
                   sqrt, ceil, floor, degrees, radians, log, pi, exp, transpose
-from colorio import CIELAB, CAM16UCS, JzAzBz, SrgbLinear
+from colorio import CIELAB, CAM16UCS, CAM16, JzAzBz, SrgbLinear
 
 L_A = 64 / pi / 5
 srgb = SrgbLinear()
 lab = CIELAB()
+cam16 = CAM16(0.69, 20, L_A)
 cam16ucs = CAM16UCS(0.69, 20, L_A)
 jzazbz = JzAzBz()
 
@@ -40,6 +41,14 @@ def cam16ucs_to_srgb(color):
 
 def srgb_to_cam16ucs(color):
     return transpose(cam16ucs.from_xyz100(srgb.to_xyz100(srgb.from_srgb1(transpose(color)))))
+
+def cam16_to_srgb(color, description='JCh'):
+    return transpose(srgb.to_srgb1(srgb.from_xyz100(cam16.to_xyz100(transpose(color), description))))
+
+def srgb_to_cam16(color):
+    return transpose(cam16.from_xyz100(srgb.to_xyz100(srgb.from_srgb1(transpose(color)))))
+    # return J, C, H, h, M, s, Q
+
 
 def _square_plot(l, k1, k2, conv, d=30):
     for x in range(-300,301,d):
@@ -247,10 +256,9 @@ def show_kluwer_themes(themes, rows=7, r=50):
             row = 1
 
 
-#import matplotlib.pyplot as plt
-#image = plt.imread('/usr/share/matplotlib/sample_data/grace_hopper.png')
-#image.shape == (600, 512, 3)
-#image_c16 = cam16ucs.from_xyz100(srgb.to_xyz100(srgb.from_srgb1(image.reshape((image.shape[0] * image.shape[1], 3)).T)))
-#pass
-#image_sr = srgb.to_srgb1(srgb.from_xyz100(cam16ucs.to_xyz100(image_c16)))
-#plt.imshow(image_sr.T.reshape(image.shape)); plt.show()
+# import matplotlib.pyplot as plt
+# image = plt.imread('/usr/share/matplotlib/sample_data/grace_hopper.png')
+# image.shape == (600, 512, 3)
+# image_c16 = cam16ucs.from_xyz100(srgb.to_xyz100(srgb.from_srgb1(image.reshape((image.shape[0] * image.shape[1], 3)).T)))
+# image_sr = srgb.to_srgb1(srgb.from_xyz100(cam16ucs.to_xyz100(image_c16)))
+# plt.imshow(image_sr.T.reshape(image.shape)); plt.show()
