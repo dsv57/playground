@@ -45,8 +45,8 @@ def trace_image(img, threshold=3, simplify_tolerance=0.7, cache=True):
     lines = None
     trace_sig = file_sig(
         stat(img.filename)), img.size, threshold, simplify_tolerance
-    print('IMG', img.width, img.height)
-    print('SIG', trace_sig, img.filename)
+    # print('IMG', img.width, img.height)
+    # print('SIG', trace_sig, img.filename)
     if cache:
         try:
             with open(img.filename + '.contour', 'rb') as f:
@@ -61,8 +61,8 @@ def trace_image(img, threshold=3, simplify_tolerance=0.7, cache=True):
     def sample_func(point):
         try:
             color = img.read_pixel(point.x, point.y)
-            if point.y == 120:
-                print(point.x, sum(color[:3]) / 3 * 255)
+            # if point.y == 120:
+            #     print(point.x, sum(color[:3]) / 3 * 255)
             return sum(color[:3]) / 3 * 255  # color[3]*255
         except Exception as e:
             print(e)  # FIXME
@@ -105,7 +105,7 @@ def trace_image(img, threshold=3, simplify_tolerance=0.7, cache=True):
         except:
             pass
 
-    print('lines', len(lines), [len(l) for l in lines])
+    # print('lines', len(lines), [len(l) for l in lines])
     return lines
 
     # for line in lines:
@@ -235,7 +235,7 @@ class Colors:
             self.set(colors, description)
 
     def reset(self):
-        self._colors = self._original_colors.copy()        
+        self._colors = self._original_colors.copy()
 
     def set(self, colors, description='sRGB'):
         cam16ucs = self._cam16ucs
@@ -401,7 +401,7 @@ class Colors:
         srgb_colors = srgb.to_srgb1(srgb.from_xyz100(cam16.to_xyz100(im.reshape((length, 3)).T, self._dimensions))).T # JCh
         self._srgb_colors = srgb_colors.clip(0, 1, srgb_colors)
         return srgb_colors
-        
+
 
     # J, C, H, h, M, s, Q = cam16.from_xyz100(xyz)
     # JQ CMs Hh
@@ -445,7 +445,7 @@ class OurImage(Image):
     image = AliasProperty(_get_image, _set_image)
 
     def set_image(self, image):
-        print('on_image ' * 30)
+        # print('on_image ' * 30)
         buf = (image * 255).flatten().astype('ubyte')
         self.texture.blit_buffer(buf, colorfmt='rgb', bufferfmt='ubyte')
 
@@ -492,7 +492,7 @@ class Sprite(Scatter):
 
     # space = ObjectProperty(None)
 
-    def __init__(self, source, x=0, y=0, scale=1, **kwargs):
+    def __init__(self, source, x=0, y=0, scale=1, rotation=0, trace=True, **kwargs):
         super(Sprite, self).__init__()
 
         self.body = pymunk.Body(body_type=pymunk.Body.KINEMATIC)
@@ -500,11 +500,13 @@ class Sprite(Scatter):
         self.space = None
         self.source = source
         self.bottom_left = (0, 0)
+        self._selection_line = None
+        self.image = None
         if source not in self._shapes:
             self._type = 'image'
             imag = Image(
-                source=source, keep_data=True,
-                anim_delay=0.05)  # , pos_hint={'center_x': 0, 'center_y': 0})
+                source=source, keep_data=trace,
+                anim_delay=kwargs.get('anim_delay', 0.05))  # , pos_hint={'center_x': 0, 'center_y': 0})
             self.add_widget(imag)
             imag.size = imag.texture_size
             self.size = imag.texture_size
@@ -514,30 +516,32 @@ class Sprite(Scatter):
             self.bottom_left = (0, 0)
             # TODO: self.bottom_left
 
-            lines = trace_image(imag._coreimage, cache=False)
+            lines = trace_image(imag._coreimage, cache=False) if trace else [] # [[(0, 0), (0, imag.size[1])], [(0, imag.size[1]), imag.size], [imag.size, (imag.size[0], 0)], [(imag.size[0], 0), (0, 0)]]
+            self.contour = lines
             with self.canvas:
                 for line in lines:
                     poly = pymunk.Poly(self.body, line)
                     # self.parent.space.add(poly)
                     self.pymunk_shapes.append(poly)
 
-                    Color(1, 0, 0)
+                    Color(1., 0., 0.)
                     self.shapes.append(
                         Line(points=[
                             coord for point in line for coord in point
                         ]))
-                    print("LL", len(line), max([p.x for p in line]),
-                          min([p.x for p in line]), max([p.y for p in line]),
-                          min([p.y for p in line]))
+                    # print("LL", len(line), max([p.x for p in line]),
+                    #       min([p.x for p in line]), max([p.y for p in line]),
+                    #       min([p.y for p in line]))
                     # for i in range(len(line)-1):
                     #     shape = pymunk.Segment(self.body, line[i], line[i+1], 1)
                     #     self.parent.space.add(shape)
-            print('------------')
-        else:
+            # print('------------')
+        else: # Polygon shape
             shape = self._shapes[source]
             self._type = shape['type']
             self.shapes = []
             self.pymunk_shapes = []
+            self.contour = shape['points']
 
             xs, ys = tuple(zip(*shape['points']))
             min_x = min(xs)
@@ -572,6 +576,8 @@ class Sprite(Scatter):
                     self.pymunk_shapes.append(poly)
                 PopMatrix()
 
+        self.position = (x, y)
+        self.rotation = rotation
         self._register()
 
     # def draw(self):
@@ -588,7 +594,6 @@ class Sprite(Scatter):
                 # print('SHapes:', self.space.shapes)
                 if shape not in self.space.shapes:
                     self.space.add(shape) # FIXME: AssertionError: shape already added to space
-        # return super().on_parent(instance, value)
 
     def collide_point(self, x, y):
         # print('bbox', self.bbox)
@@ -596,12 +601,17 @@ class Sprite(Scatter):
             for shape in self.pymunk_shapes:
                 pq = shape.point_query((x, y))
                 if pq[0] < 0:
+                    # print('Collide!')
                     return True
         return False  # super().collide_point(x, y) #False
 
     def on_position(self, instance, position):
-        print('On position', position)
+        # print('On position', position)
         self.position = position
+        if self._selection_line:
+            contour = [(p[0] + position[0], p[1] + position[1]) for p in self.contour]
+            self._selection_line.points = contour
+
         # print('ON POS', self.space, self.space and self.space.shapes, self.pymunk_shapes)
         # self.body.position = position # self.to_parent(*pos)
         # if self.space:
@@ -611,6 +621,60 @@ class Sprite(Scatter):
         #     pq = Sprite.space.point_query((x, y), 0.0, pymunk.ShapeFilter())
         #     print('PQ:', pq)
         #     return pq
+
+    # def on_touch_up(self, touch):
+        #print(touch)
+        # if touch.grab_current is not self:
+        #     return
+        # assert(repr(self) in touch.ud)
+        # touch.ungrab(self)
+
+        # print('t. up', touch.dpos, touch.pos, touch.ppos)
+        # print(touch.dpos == (0.0, 0.0), self.collide_point(touch.x, touch.y))
+        # if touch.dpos == (0.0, 0.0) and self.collide_point(touch.x, touch.y):
+        #     if self._selection_line:
+        #         print('Clear')
+        #         self.canvas.after.clear() #remove(self._selection_line)
+        #         self._selection_line = None
+        #     else:
+        #         print('Add')
+        #         with self.canvas.after:
+        #             Color(0.2, 0.3, 1)
+        #             x, y = self.position #self.bottom_left
+        #             contour = [(p[0] + x, p[1] + y) for p in self.contour]
+        #             # print('cont',contour)
+        #             line = Line(points=contour, width=1.5)
+        #             print('line', line)
+        #             self._selection_line = line
+        # # return True
+        # return super(Sprite, self).on_touch_up(touch)
+
+    # def on_touch_move(self, touch):
+    #     return repr(self) in touch.ud
+
+    def on_touch_down(self, touch):
+        # print('touch', touch, touch.dpos, (touch.ox, touch.oy), touch.pos, touch.ppos)
+        if not self.collide_point(touch.x, touch.y):
+            return False
+        # if repr(self) in touch.ud:
+        #     return False
+        # touch.grab(self)
+        # touch.ud[repr(self)] = True
+        # return True
+
+        # return super(Sprite, self).on_touch_down(touch)
+        if self.collide_point(touch.x, touch.y):
+            if self._selection_line:
+                self.canvas.after.remove(self._selection_line)
+                self._selection_line = None
+            else:
+                with self.canvas.after:
+                    Color(0.2, 0.3, 1)
+                    x, y = self.position #self.bottom_left
+                    contour = [(p[0] + x, p[1] + y) for p in self.contour]
+                    self._selection_line = Line(points=contour, dash_offset=5, dash_length=10, width=1.5)
+        return super(Sprite, self).on_touch_down(touch)
+        #touch.grab(self)
 
     # def on_touch_down(self, touch):
     #     print(touch)

@@ -5,6 +5,7 @@ from random import random, randint, uniform, choice, seed
 #from numpy import sin, cos, arctan2, sqrt, ceil, floor, degrees, radians, log, pi, exp
 from math import sin, cos, atan2, sqrt, ceil, floor, degrees, radians, log, pi, exp
 from copy import deepcopy
+from time import process_time
 # from sys import exc_info
 import re
 
@@ -20,26 +21,29 @@ from kivy.uix.textinput import FL_IS_LINEBREAK
 from kivy.uix.behaviors import FocusBehavior
 from kivy.uix.codeinput import CodeInput
 from kivy.uix.widget import Widget
+from kivy.uix.image import Image
 from kivy.uix.stencilview import StencilView
 from kivy.uix.scatter import ScatterPlane
 from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.gridlayout import GridLayout
 from kivy.graphics import Color, Line, Rectangle, Ellipse, Triangle, \
-        PushMatrix, PopMatrix
+        PushMatrix, PopMatrix, RoundedRectangle
 from kivy.graphics.transformation import Matrix
 from kivy.graphics.context_instructions import Rotate, Translate, Scale
 from kivy.properties import StringProperty, NumericProperty, \
         ListProperty, ObjectProperty, BooleanProperty, \
         OptionProperty, DictProperty
 from kivy.clock import Clock
+from kivy.cache import Cache
+from kivy.core.text.markup import MarkupLabel
 from kivy.core.window import Window # request keyboard
 
 import pymunk
 
 from ourturtle import Turtle, Vec2d
 from sprite import Sprite, OurImage
-from codean import autocomp, CodeRunner, COMMON_CODE
-
+from codean import autocomp, CodeRunner, Break, COMMON_CODE
+from sokoban.level import Level
 
 try:
     import mycolors
@@ -52,10 +56,27 @@ F_UPDATE = 'update'
 F_ON_KEY_PRESS = 'on_key_press'
 F_ON_KEY_RELEASE = 'on_key_release'
 
+R_TURN = re.compile(r'^(\s*)(right|left|up|down)\(([0-9]*)\)$')
+
+
+def whos(vars, max_repr=40):
+    w_types = (int, float, str, list, dict, tuple)
+    def w_repr(v):
+        r = repr(v)
+        return r if len(r) < max_repr else r[:max_repr-3] + '...'
+    return [(k, type(v).__qualname__, w_repr(v))
+            for k, v in vars.items()
+            if isinstance(v, w_types) and k[0] != '_']
+
 
 class CodeEditor(CodeInput):
     def __init__(self, **kwargs):
-        self._highlight_line = None
+        # self._highlight_line = None
+        self.hightlight_styles = {
+            'error': (True, (.9, .1, .1, .4))
+        }
+        self._highlight = defaultdict(lambda: [])
+        self._highlight['error'].append(3)
         self.namespace = {}
         self.ac_begin = False
         self.ac_current = 0
@@ -72,8 +93,14 @@ class CodeEditor(CodeInput):
 #        print('_create_line_label', text, hint)
 #        return super(CodeEditor, self)._create_line_label(text, hint)
 
-    def highlight_line(self, line_num):
-        self._highlight_line = line_num
+    def highlight_line(self, line_num, style='error', add=False):
+        if line_num:
+            if add:
+                self._highlight[style].append(line_num)
+            else:
+                self._highlight[style] = [line_num]
+        else:
+            self._highlight[style].clear()
         self._trigger_update_graphics()
 
     def _update_graphics(self, *largs):
@@ -81,74 +108,112 @@ class CodeEditor(CodeInput):
         self._update_graphics_highlight()
 
     def _update_graphics_highlight(self):
-        if not self._highlight_line:
+        if not self._highlight:
             return
-        self.canvas.remove_group('highlight')
-        dy = self.line_height + self.line_spacing
-        rects = self._lines_rects
-        padding_top = self.padding[1]
-        padding_bottom = self.padding[3]
-        _top = self.top
-        y = _top - padding_top + self.scroll_y
-        miny = self.y + padding_bottom
-        maxy = _top - padding_top
-        draw_highlight = self._draw_highlight
-        line_num = self._highlight_line - 1
-        # pass only the selection lines[]
-        # passing all the lines can get slow when dealing with a lot of text
-        y -= line_num * dy
-        _lines = self._lines
-        _get_text_width = self._get_text_width
-        tab_width = self.tab_width
-        _label_cached = self._label_cached
-        width = self.width
-        padding_left = self.padding[0]
-        padding_right = self.padding[2]
-        x = self.x
-        highlight_color = (.9, .1, .1, .3)
-        # value = _lines[line_num]
-        if miny <= y <= maxy + dy:
-            r = rects[line_num]
-            draw_highlight(r.pos, r.size, line_num, _lines, _get_text_width,
-                           tab_width, _label_cached, width, padding_left,
-                           padding_right, x, highlight_color)
-        y -= dy
+        for style in self._highlight:
+            self.canvas.remove_group('hl-'+style)
+            for line_num in self._highlight[style]:
+                dy = self.line_height + self.line_spacing
+                padding_top = self.padding[1]
+                padding_bottom = self.padding[3]
+                y = self.top - padding_top + self.scroll_y
+                miny = self.y + padding_bottom
+                maxy = self.top - padding_top
+                line_num -= 1
+                # pass only the selection lines[]
+                # passing all the lines can get slow when dealing with a lot of text
+                y -= line_num * dy
+                highlight_color = (.9, .1, .1, .5)
+                if miny <= y <= maxy + dy:
+                    self._draw_highlight(line_num, style)
         self._position_handles('both')
 
-    def _draw_highlight(self, *largs):
-        pos, size, line_num,\
-            _lines, _get_text_width, tab_width, _label_cached, width,\
-            padding_left, padding_right, x, selection_color = largs
+    def _draw_highlight(self, line_num, style):
+        fill, highlight_color = self.hightlight_styles[style]
+        rect = self._lines_rects[line_num]
+        pos = rect.pos
+        size = rect.size
         # Draw the current selection on the widget.
         x, y = pos
         w, h = size
         x1 = x
         x2 = x + w
-        lines = _lines[line_num]
+        lines = self._lines[line_num]
         x1 -= self.scroll_x
-        x2 = (x - self.scroll_x) + _get_text_width(lines, tab_width,
-                                                   _label_cached)
-        width_minus_padding = width - (padding_right + padding_left)
+        x2 = (x - self.scroll_x) + self._get_text_width(lines, self.tab_width,
+                                                   self._label_cached)
+        width_minus_padding = self.width - (self.padding[2] + self.padding[0])
         maxx = x + width_minus_padding
         if x1 > maxx:
             return
         x1 = max(x1, x)
         x2 = min(x2, x + width_minus_padding)
-        self.canvas.add(Color(*selection_color, group='highlight'))
-        self.canvas.add(
-            Rectangle(
-                pos=(x1, pos[1]), size=(x2 - x1, size[1]), group='highlight'))
+
+        self.canvas.add(Color(*highlight_color, group='hl-'+style))
+        # self.canvas.add(
+        #     Rectangle(
+        #         pos=(x1, pos[1]), size=(x2 - x1, size[1]), group='highlight'))
+        group='hl-'+style
+        with self.canvas:
+            Color(*highlight_color, group=group)
+            if fill:
+                RoundedRectangle(
+                    pos=(x1, pos[1]), size=(x2 - x1, size[1]),
+                    radius=(4, 4), segments=3, group=group)
+            else:
+                Line(
+                    rounded_rectangle=(x1, pos[1], x2 - x1, size[1], 4),
+                    width=1.3, group=group)
+        # self.canvas.add(
+        #     Line(rounded_rectangle=(x1, pos[1], x2 - x1, size[1], 4), width=1.3, group='highlight'))
+
 
     def _split_smart(self, text):
-        # Disable word wrapping (because of broken highlight)
+        # Disable word wrapping (because of broken syntax highlight)
         lines = text.split(u'\n')
         lines_flags = [0] + [FL_IS_LINEBREAK] * (len(lines) - 1)
         return lines, lines_flags
 
+    def _create_line_label(self, text, hint=False):
+        # Fix empty lines bug
+        # Create a label from a text, using line options
+        ntext = text.replace(u'\n', u'').replace(u'\t', u' ' * self.tab_width)
+        ntext = self._get_bbcode(ntext)
+        kw = self._get_line_options()
+        cid = u'{}\0{}\0{}'.format(ntext, self.password, kw)
+        texture = Cache.get('textinput.label', cid)
+
+        if texture is None:
+            # FIXME right now, we can't render very long line...
+            # if we move on "VBO" version as fallback, we won't need to
+            # do this.
+            # try to find the maximum text we can handle
+            label = MarkupLabel(text=ntext, **kw)
+            label.refresh()
+            # ok, we found it.
+            texture = label.texture
+            Cache.append('textinput.label', cid, texture)
+            label.text = ''
+        return texture
+
+    def _auto_indent(self, substring):
+        index = self.cursor_index()
+        _text = self._get_text(encode=False)
+        if index > 0:
+            line_start = _text.rfind('\n', 0, index)
+            # print('_auto_indent', repr(index), repr(_text), repr(line_start), repr(_text[line_start + 1:index]))
+            if line_start > -1:
+                line = _text[line_start + 1:index]
+                indent = self.re_indent.match(line).group()
+                if line[-1] == ':':
+                    indent += ' ' * self.tab_width
+                substring += indent
+        return substring
+
     def keyboard_on_key_down(self, window, keycode, text, modifiers):
         # print('keyboard_on_key_down', keycode, text, modifiers)
         key, key_str = keycode
-        print('kk', keycode)
+        print('kk', keycode, text, modifiers)
         if key == 9:  # Tab
             cc, cr = self.cursor
             _lines = self._lines
@@ -184,6 +249,45 @@ class CodeEditor(CodeInput):
                     ac = self.ac_completions[self.ac_current]
                     self.insert_text(ac.complete)
                     # self.ac_state[2] = len(ac.complete)
+            return True
+
+        elif modifiers == ['alt'] and key_str in ['up', 'down', 'right', 'left']:
+            print(self._lines)
+            cc, cr = self.cursor
+            empty_line = self._lines[cr].strip() == ''
+            if empty_line:
+                cr -= 1
+            # if self._lines[cr].strip():
+            #     self.do_cursor_movement('cursor_end')
+            #     self.insert_text('\n')
+            #     cc, cr = self.cursor
+            # l1 = self._lines[:cr]
+            # l2 = self._lines[cr:]
+            # self._lines = l1 + [key_str+'()'] + l2
+
+            # self._selection_from = self._selection_to = self.cursor_index()
+            # self._selection = True
+            # self._selection_finished = False
+            space = ''
+            if cr >= 0:
+                prev_line = self._lines[cr]
+                m = R_TURN.match(prev_line)
+                if m:
+                    space, cmd, steps = m.groups()
+                    if cmd == key_str:
+                        if steps:
+                            steps = str(int(steps)+1)
+                        else:
+                            steps = '2'
+                        self._set_line_text(cr, space + cmd + '(' + steps + ')')
+                        # self._lines[cr-1] = space + cmd + '(' + steps + ')'
+                        return True
+            key_str = space + key_str
+            if not empty_line:
+                self.do_cursor_movement('cursor_end')
+                key_str = '\n' + key_str
+            self.insert_text(f'{key_str}()')
+            # self.cursor = (cc, cr+1)
             return True
         self.ac_begin = False
         super(CodeInput, self).keyboard_on_key_down(window, keycode, text,
@@ -352,20 +456,28 @@ class Playground(FloatLayout):
 # img.set_image(image_sr)
 # im = img.imc16.copy()
 
-    init_code = StringProperty('''#penup()
+# import numpy as np
+# im = np.array([img.imc16[...,0].T, img.imc16[...,5].T, img.imc16[...,3].T]).T
+# im[...,2] += a
+# im[...,2] %= 360
+# im[...,1] *= b
+# im[...,0] *= c
+# img.set_imc16(im, 'Jsh')
+# def update():
+#   pass
 
-import numpy as np
-im = np.array([img.imc16[...,0].T, img.imc16[...,5].T, img.imc16[...,3].T]).T
 
-im[...,2] += a
-im[...,2] %= 360
-im[...,1] *= b
-im[...,0] *= c
-img.set_imc16(im, 'Jsh')
-
-def update():
-  pass
-
+    init_code = StringProperty('''
+up()
+left(4)
+right()
+up(3)
+left()
+up()
+left(2)
+down()
+left(2)
+down(3)
 ''')
 
       # print(123)
@@ -387,6 +499,7 @@ def update():
     vars = DictProperty({})
 
     console = StringProperty('')
+    watches = StringProperty('')
 
     sandbox = ObjectProperty(None)
     init_editor = ObjectProperty(None)
@@ -394,7 +507,7 @@ def update():
     textout = ObjectProperty(None)
     run_to_cursor = BooleanProperty(False)
 
-    #    ball = ObjectProperty(None)
+    # ball = ObjectProperty(None)
 
     def __init__(self, **kwargs):
         super(Playground, self).__init__(**kwargs)
@@ -403,7 +516,7 @@ def update():
 
         globs = dict()
         for v in 'random randint uniform choice seed sin cos atan2 \
-                sqrt ceil floor degrees radians log pi exp'.split(
+                sqrt ceil floor degrees radians log exp'.split(
         ):
             globs[v] = eval(v)
 
@@ -429,34 +542,60 @@ def update():
         except:
             pass
 
+        wall = 'sokoban/images/wall.png'
+        box = 'sokoban/images/box.png'
+        box_on_target = 'sokoban/images/box_on_target.png'
+        space = 'sokoban/images/space.png'
+        target = 'sokoban/images/target.png'
+        player = 'sokoban/images/player.png'
+        # player = 'sokoban/images/beetle-robot.png'
+        self._sokoban_images = {'#': wall, ' ': space, '$': box, '.': target, '@': player, '*': box_on_target}
+
+        self._sokobal_level_number = 1
+        self._sokoban_level = Level('our', 1)
+        self._sokoban_tiles = None
+        # draw_level(my_level.get_matrix())
+        self._sokoban_target_found = False
+        self._sokoban_dir = 'U'
+        self._sokoban_player_pos = self._sokoban_level.get_player_position()
+
+        def sokoban_go(direction):
+            def go(steps=1):
+                self.sokoban_move_player(direction, steps)
+            return go
+        globs['right'] = sokoban_go('R')
+        globs['left'] = sokoban_go('L')
+        globs['up'] = sokoban_go('U')
+        globs['down'] = sokoban_go('D')
+        # globs['right'] = lambda: self.sokoban_turn(1) # setattr(self, '_sokoban_dir', {'R': 'D', 'L': 'U', 'U': 'R', 'D': 'L'}[self._sokoban_dir])
+        # globs['left'] = lambda: self.sokoban_turn(-1) # setattr(self, '_sokoban_dir', {'R': 'U', 'L': 'D', 'U': 'L', 'D': 'R'}[self._sokoban_dir])
+        # globs['forward'] = self.sokoban_move_player
 
         # self.sandbox.add_widget(Sprite('images/simple_cv_joint_animated.gif'))  # orc.gif
         # self.sandbox.add_widget(Sprite('images/bird.zip')) #orc.gif
         # self.sandbox.add_widget(Sprite('images/cube.zip')) #orc.gif
-        self.sandbox.add_widget(Sprite('turtle'))
-        img = OurImage(source='grace_hopper.jpg')
-        globs['image'] = img.image
-        # self.sandbox.add_widget(img)
-        globs['img'] = img
-
+        # self.sandbox.add_widget(Sprite('turtle'))
+        # img = Our'grace_hopper.jpg')
+        # globs['image'] = img.image
+        # globs['img'] = img
 
         self.runner = CodeRunner(globals=globs, special_funcs=['update'])
 
+        self.init_editor.namespace = self.runner.globals  # FIXME?
 
-        self.init_editor.namespace = self.runner.globals # FIXME?
-
-        vs1 = VarSlider(var_name='a', min=0, max=360, type='float')
-        vs2 = VarSlider(var_name='b', type='float')
-        vs3 = VarSlider(var_name='c', type='float')
-        vs4 = VarSlider(var_name='l', min=0, max=50)
-        vs5 = VarSlider(var_name='m', min=0, max=100)
-        vs6 = VarSlider(var_name='n', min=0, max=150)
-        self.rpanel.add_widget(vs1, 1)
-        self.rpanel.add_widget(vs2, 1)
-        self.rpanel.add_widget(vs3, 1)
-        self.rpanel.add_widget(vs4, 1)
-        self.rpanel.add_widget(vs5, 1)
-        self.rpanel.add_widget(vs6, 1)
+        # FIXME
+        # vs1 = VarSlider(var_name='a', min=0, max=360, type='float')
+        # vs2 = VarSlider(var_name='b', type='float')
+        # vs3 = VarSlider(var_name='c', type='float')
+        # vs4 = VarSlider(var_name='l', min=0, max=50)
+        # vs5 = VarSlider(var_name='m', min=0, max=100)
+        # vs6 = VarSlider(var_name='n', min=0, max=150)
+        # self.rpanel.add_widget(vs1, 1)
+        # self.rpanel.add_widget(vs2, 1)
+        # self.rpanel.add_widget(vs3, 1)
+        # self.rpanel.add_widget(vs4, 1)
+        # self.rpanel.add_widget(vs5, 1)
+        # self.rpanel.add_widget(vs6, 1)
 
         self.steps = 0
         self.trigger_exec = Clock.create_trigger(self.execute_code, -1)
@@ -469,18 +608,19 @@ def update():
             if wid.var_name in self.runner.common_vars:
                 self.trigger_exec()
 
-        vs1.bind(value=_set_var)
-        vs2.bind(value=_set_var)
-        vs3.bind(value=_set_var)
-        vs4.bind(value=_set_var)
-        vs5.bind(value=_set_var)
-        vs6.bind(value=_set_var)
-        vs1.value = 1.2
-        vs2.value = 3.4
-        vs3.value = 4.2
-        vs4.value = 15
-        vs5.value = 50
-        vs6.value = 75
+        # FIXME
+        # vs1.bind(value=_set_var)
+        # vs2.bind(value=_set_var)
+        # vs3.bind(value=_set_var)
+        # vs4.bind(value=_set_var)
+        # vs5.bind(value=_set_var)
+        # vs6.bind(value=_set_var)
+        # vs1.value = 1.2
+        # vs2.value = 3.4
+        # vs3.value = 4.2
+        # vs4.value = 15
+        # vs5.value = 50
+        # vs6.value = 75
 
         self.compile_code()
 
@@ -490,82 +630,442 @@ def update():
         self.trigger_exec_run = Clock.create_trigger(self.execute_run, -1)
         self.run_schedule = None  # Clock.schedule_interval(self.trigger_exec_run, 1.0 / 60.0)
 
+    def sokoban_turn(self, dir):
+        if dir == 1:
+            self._sokoban_dir = {'R': 'D', 'L': 'U', 'U': 'R', 'D': 'L'}[self._sokoban_dir]
+        else:
+            self._sokoban_dir = {'R': 'U', 'L': 'D', 'U': 'L', 'D': 'R'}[self._sokoban_dir]
+
+    def sokoban_draw_level(self, update=False):
+        images = self._sokoban_images
+        matrix = self._sokoban_level.get_matrix()
+        if not update:
+            self._sokoban_tiles = []
+        for i, row in enumerate(matrix):
+            if not update:
+                self._sokoban_tiles.append([])
+            for j, c in enumerate(row):
+                # rot = {'R': -90, 'L': 90, 'U': 0, 'D': 180}[self._sokoban_dir] if c == '@' else 0
+                if update:
+                    tile = self._sokoban_tiles[i][j]
+                    image = tile.shapes[0]
+                    if image.source != images[c]:
+                        image.source = images[c]
+                        # tile.clear_widgets()
+                        # img = Image(source=images[c])
+                        # tile.add_widget(img)
+                        # tile.shapes[0] = img
+                        # with self._sokoban_tiles[i][j].canvas:
+                        #     Color(1,0,0)
+                        #     Rectangle(pos=(0, 0), size=(20,20))
+                        # with self._sokoban_tiles[i][j].canvas.after:
+                        #     Color(1,0,0)
+                        #     Rectangle(pos=(0, 0), size=(10,20))
+
+                        # self._sokoban_tiles[i][j].x += 10
+                        # self._sokoban_tiles[i][j].position = (30, 30)
+                        # image.reload()
+                        print('Reload', images[c])
+
+                    # print('Upd:', self._sokoban_tiles[i][j].shapes[0].source, images[c])
+                    # self._sokoban_tiles[i][j].shapes[0].source = images[c]
+                else:
+                    tile = Sprite(images[c], x=36*j, y=36*(len(matrix)-i), trace=False)
+                    self._sokoban_tiles[-1].append(tile)
+                    self.sandbox.add_widget(tile) # Sprite(images[c], x=36*j, y=36*(len(matrix)-i), trace=False)) # rotation=0,
+
+    def sokoban_move_player(self, direction, steps=1):
+        # direction = self._sokoban_dir
+        my_level = self._sokoban_level
+        target_found = self._sokoban_target_found
+        matrix = my_level.get_matrix()
+
+        my_level.add_to_history(matrix)
+
+        # print boxes
+        # print(my_level.get_boxes())
+
+        if steps < 0:
+            direction = {'R': 'L', 'L': 'R', 'U': 'D', 'D': 'U'}[direction]
+            steps = -steps
+
+        while steps > 0:
+            x, y = self._sokoban_player_pos
+            # print('target_found 1', target_found)
+
+            if direction == "L":
+                # print("######### Moving Left #########")
+
+                # if is_space
+                if matrix[y][x-1] == " ":
+                    # print("OK Space Found")
+                    matrix[y][x-1] = "@"
+                    self._sokoban_player_pos = (x-1, y)
+                    if target_found == True:
+                        matrix[y][x] = "."
+                        target_found = False
+                    else:
+                        matrix[y][x] = " "
+
+                # if is_box
+                elif matrix[y][x-1] == "$":
+                    # print("Box Found")
+                    if matrix[y][x-2] == " ":
+                        matrix[y][x-2] = "$"
+                        matrix[y][x-1] = "@"
+                        self._sokoban_player_pos = (x-1, y)
+                        if target_found == True:
+                            matrix[y][x] = "."
+                            target_found = False
+                        else:
+                            matrix[y][x] = " "
+                    elif matrix[y][x-2] == ".":
+                        matrix[y][x-2] = "*"
+                        matrix[y][x-1] = "@"
+                        self._sokoban_player_pos = (x-1, y)
+                        if target_found == True:
+                            matrix[y][x] = "."
+                            target_found = False
+                        else:
+                            matrix[y][x] = " "
+                    else:
+                        raise Exception('cannot go there')
+
+                # if is_box_on_target
+                elif matrix[y][x-1] == "*":
+                    # print("Box on target Found")
+                    if matrix[y][x-2] == " ":
+                        matrix[y][x-2] = "$"
+                        matrix[y][x-1] = "@"
+                        self._sokoban_player_pos = (x-1, y)
+                        if target_found == True:
+                            matrix[y][x] = "."
+                        else:
+                            matrix[y][x] = " "
+                        target_found = True
+
+                    elif matrix[y][x-2] == ".":
+                        matrix[y][x-2] = "*"
+                        matrix[y][x-1] = "@"
+                        self._sokoban_player_pos = (x-1, y)
+                        if target_found == True:
+                            matrix[y][x] = "."
+                        else:
+                            matrix[y][x] = " "
+                        target_found = True
+
+                    else:
+                        raise Exception('cannot go there')
+
+                # if is_target
+                elif matrix[y][x-1] == ".":
+                    # print("Target Found")
+                    matrix[y][x-1] = "@"
+                    self._sokoban_player_pos = (x-1, y)
+                    if target_found == True:
+                        matrix[y][x] = "."
+                    else:
+                        matrix[y][x] = " "
+                    target_found = True
+
+                # else
+                else:
+                    # print("There is a wall here")
+                    raise Exception('cannot go there')
+
+            elif direction == "R":
+                # print("######### Moving Right #########")
+
+                # if is_space
+                if matrix[y][x+1] == " ":
+                    # print("OK Space Found")
+                    matrix[y][x+1] = "@"
+                    self._sokoban_player_pos = (x+1, y)
+                    if target_found == True:
+                        matrix[y][x] = "."
+                        target_found = False
+                    else:
+                        matrix[y][x] = " "
+
+                # if is_box
+                elif matrix[y][x+1] == "$":
+                    # print("Box Found")
+                    if matrix[y][x+2] == " ":
+                        matrix[y][x+2] = "$"
+                        matrix[y][x+1] = "@"
+                        self._sokoban_player_pos = (x+1, y)
+                        if target_found == True:
+                            matrix[y][x] = "."
+                            target_found = False
+                        else:
+                            matrix[y][x] = " "
+
+                    elif matrix[y][x+2] == ".":
+                        matrix[y][x+2] = "*"
+                        matrix[y][x+1] = "@"
+                        self._sokoban_player_pos = (x+1, y)
+                        if target_found == True:
+                            matrix[y][x] = "."
+                            target_found = False
+                        else:
+                            matrix[y][x] = " "
+
+                    else:
+                        raise Exception('cannot go there')
+
+                # if is_box_on_target
+                elif matrix[y][x+1] == "*":
+                    # print("Box on target Found")
+                    if matrix[y][x+2] == " ":
+                        matrix[y][x+2] = "$"
+                        matrix[y][x+1] = "@"
+                        self._sokoban_player_pos = (x+1, y)
+                        if target_found == True:
+                            matrix[y][x] = "."
+                        else:
+                            matrix[y][x] = " "
+                        target_found = True
+
+                    elif matrix[y][x+2] == ".":
+                        matrix[y][x+2] = "*"
+                        matrix[y][x+1] = "@"
+                        self._sokoban_player_pos = (x+1, y)
+                        if target_found == True:
+                            matrix[y][x] = "."
+                        else:
+                            matrix[y][x] = " "
+                        target_found = True
+
+                    else:
+                        raise Exception('cannot go there')
+
+                # if is_target
+                elif matrix[y][x+1] == ".":
+                    # print("Target Found")
+                    matrix[y][x+1] = "@"
+                    self._sokoban_player_pos = (x+1, y)
+                    if target_found == True:
+                        matrix[y][x] = "."
+                    else:
+                        matrix[y][x] = " "
+                    target_found = True
+
+                # else
+                else:
+                    # print("There is a wall here")
+                    raise Exception('cannot go there')
+
+            elif direction == "D":
+                # print("######### Moving Down #########")
+
+                # if is_space
+                if matrix[y+1][x] == " ":
+                    # print("OK Space Found")
+                    matrix[y+1][x] = "@"
+                    self._sokoban_player_pos = (x, y+1)
+                    if target_found == True:
+                        matrix[y][x] = "."
+                        target_found = False
+                    else:
+                        matrix[y][x] = " "
+
+                # if is_box
+                elif matrix[y+1][x] == "$":
+                    # print("Box Found")
+                    if matrix[y+2][x] == " ":
+                        matrix[y+2][x] = "$"
+                        matrix[y+1][x] = "@"
+                        self._sokoban_player_pos = (x, y+1)
+                        if target_found == True:
+                            matrix[y][x] = "."
+                            target_found = False
+                        else:
+                            matrix[y][x] = " "
+
+                    elif matrix[y+2][x] == ".":
+                        matrix[y+2][x] = "*"
+                        matrix[y+1][x] = "@"
+                        self._sokoban_player_pos = (x, y+1)
+                        if target_found == True:
+                            matrix[y][x] = "."
+                            target_found = False
+                        else:
+                            matrix[y][x] = " "
+
+                    else:
+                        raise Exception('cannot go there')
+
+                # if is_box_on_target
+                elif matrix[y+1][x] == "*":
+                    # print("Box on target Found")
+                    if matrix[y+2][x] == " ":
+                        matrix[y+2][x] = "$"
+                        matrix[y+1][x] = "@"
+                        self._sokoban_player_pos = (x, y+1)
+                        if target_found == True:
+                            matrix[y][x] = "."
+                        else:
+                            matrix[y][x] = " "
+                        target_found = True
+
+                    elif matrix[y+2][x] == ".":
+                        matrix[y+2][x] = "*"
+                        matrix[y+1][x] = "@"
+                        self._sokoban_player_pos = (x, y+1)
+                        if target_found == True:
+                            matrix[y][x] = "."
+                        else:
+                            matrix[y][x] = " "
+                        target_found = True
+
+                    else:
+                        raise Exception('cannot go there')
+
+                # if is_target
+                elif matrix[y+1][x] == ".":
+                    # print("Target Found")
+                    matrix[y+1][x] = "@"
+                    self._sokoban_player_pos = (x, y+1)
+                    if target_found == True:
+                        matrix[y][x] = "."
+                    else:
+                        matrix[y][x] = " "
+                    target_found = True
+
+                # else
+                else:
+                    # print("There is a wall here")
+                    raise Exception('cannot go there')
+
+            elif direction == "U":
+                # print("######### Moving Up #########")
+
+                # if is_space
+                if matrix[y-1][x] == " ":
+                    # print("OK Space Found")
+                    matrix[y-1][x] = "@"
+                    self._sokoban_player_pos = (x, y-1)
+                    if target_found == True:
+                        matrix[y][x] = "."
+                        target_found = False
+                    else:
+                        matrix[y][x] = " "
+
+                # if is_box
+                elif matrix[y-1][x] == "$":
+                    # print("Box Found")
+                    if matrix[y-2][x] == " ":
+                        matrix[y-2][x] = "$"
+                        matrix[y-1][x] = "@"
+                        self._sokoban_player_pos = (x, y-1)
+                        if target_found == True:
+                            matrix[y][x] = "."
+                            target_found = False
+                        else:
+                            matrix[y][x] = " "
+
+                    elif matrix[y-2][x] == ".":
+                        matrix[y-2][x] = "*"
+                        matrix[y-1][x] = "@"
+                        self._sokoban_player_pos = (x, y-1)
+                        if target_found == True:
+                            matrix[y][x] = "."
+                            target_found = False
+                        else:
+                            matrix[y][x] = " "
+
+                    else:
+                        raise Exception('cannot go there')
+
+                # if is_box_on_target
+                elif matrix[y-1][x] == "*":
+                    # print("Box on target Found")
+                    if matrix[y-2][x] == " ":
+                        matrix[y-2][x] = "$"
+                        matrix[y-1][x] = "@"
+                        self._sokoban_player_pos = (x, y-1)
+                        if target_found == True:
+                            matrix[y][x] = "."
+                        else:
+                            matrix[y][x] = " "
+                        target_found = True
+
+                    elif matrix[y-2][x] == ".":
+                        matrix[y-2][x] = "*"
+                        matrix[y-1][x] = "@"
+                        self._sokoban_player_pos = (x, y-1)
+                        if target_found == True:
+                            matrix[y][x] = "."
+                        else:
+                            matrix[y][x] = " "
+                        target_found = True
+
+                    else:
+                        raise Exception('cannot go there')
+
+                # if is_target
+                elif matrix[y-1][x] == ".":
+                    # print("Target Found")
+                    matrix[y-1][x] = "@"
+                    self._sokoban_player_pos = (x, y-1)
+                    if target_found == True:
+                        matrix[y][x] = "."
+                    else:
+                        matrix[y][x] = " "
+                    target_found = True
+
+                # else
+                else:
+                    # print("There is a wall here")
+                    raise Exception('cannot go there')
+            # print('target_found 2', target_found)
+            self._sokoban_target_found = target_found
+            steps -= 1
+
+        # draw_level(matrix)
+
+        # print("Boxes remaining: " + str(len(my_level.get_boxes())))
+
+        if len(my_level.get_boxes()) == 0:
+            # my_environment.screen.fill((0, 0, 0))
+            print("Level Completed")
+            self._sokobal_level_number += 1
+            self._sokoban_level = Level('our', self._sokobal_level_number)
+            self._sokoban_tiles = None
+            self._sokoban_target_found = False
+            self.sandbox.clear_widgets()
+            self.sokoban_draw_level()
+            # global current_level
+            # current_level += 1
+            # init_level(level_set,current_level)
+
     def on_init_editor_cursor_row(self, *largs):
         if self.run_to_cursor:
             self.compile_code()
 
     def update_sandbox(self, redraw=True):
-        if redraw:
-            self.graphics_instructions = []
-            # self.sandbox.canvas.clear()
+        try:
+            if redraw:
+                self.graphics_instructions = []
+                # self.sandbox.canvas.clear()
 
-            # Clear the Right Way (Thank you Mark Vasilkov)
-            saved = self.sandbox.children[:]
-            self.sandbox.clear_widgets()
-            self.sandbox.canvas.clear()
-            self.sandbox.space.remove(*self.sandbox.space.shapes)
-            self.sandbox.space.remove(*self.sandbox.space.bodies)
-            for widget in saved:
-                self.sandbox.add_widget(widget)
+                # Clear the Right Way (Thank you Mark Vasilkov)
+                saved = self.sandbox.children[:]
+                self.sandbox.clear_widgets()
+                self.sandbox.canvas.clear()
+                self.sandbox.space.remove(*self.sandbox.space.shapes)
+                self.sandbox.space.remove(*self.sandbox.space.bodies)
+                for widget in saved:
+                    self.sandbox.add_widget(widget)
 
-            with self.sandbox.canvas:
-                for t in Turtle.turtles():
-                    for color, width, points in t._lines:
-                        # if self.run_to_cursor:
-                        # color = *color[:3], 0.5
-                        # igroup = InstructionGroup()
-                        ci = Color(*color)
-                        li = Line(
-                            points=points,
-                            width=width,
-                            joint='round',
-                            cap='round')
-                        self.graphics_instructions.append((deepcopy(
-                            (color, width, points)), ci, li))
-                    for shape, pos, size, color in t._stamps:
-                        # if self.run_to_cursor:
-                        # color = *color[:3], 0.5
-                        with self.sandbox.canvas:
-                            Color(*color)
-                            if shape == 'Ellipse':
-                                Ellipse(
-                                    pos=pos - 0.5 * Vec2d(size[0], size[1]),
-                                    size=(size[0], size[1]))
-                            elif shape == 'Rectangle':
-                                Rectangle(
-                                    pos=pos - 0.5 * Vec2d(size[0], size[1]),
-                                    size=(size[0], size[1]))
+                self.sokoban_draw_level(self._sokoban_tiles is not None)
 
-                    PushMatrix()
-                    size = t._shapesize
-                    Translate(*t._position)
-                    Scale(size)
-                    Rotate(angle=t.heading(), axis=(0, 0, 1), origin=(0, 0))
-                    Color(*t._pencolor)
-                    Triangle(points=[0, -10, 30, 0, 0, 10])
-                    PopMatrix()
-                # for s in Sprite._instances:
-                #     s.draw()
-                    # self.sandbox.add_widget(s)
-        else:
-            i = 0
-            instrs = len(self.graphics_instructions)
-            # st_ch = 0
-            # st_n = 0
-            with self.sandbox.canvas:
-                for t in Turtle.turtles():
-                    for color, width, points in t._lines:
-                        if i < instrs:
-                            line, ci, li = self.graphics_instructions[i]
-                            # print(line)
-                            if line != (color, width, points):
-                                # print("CHANGE", points, li.points)
-                                li.points = points
-                                self.graphics_instructions[i] = (deepcopy(
-                                    (color, width, points)), ci, li)
-                                # st_ch += 1
-                        else:
-                            # st_n += 1
+                with self.sandbox.canvas:
+                    for t in Turtle.turtles():
+                        for color, width, points in t._lines:
+                            # if self.run_to_cursor:
+                            # color = *color[:3], 0.5
+                            # igroup = InstructionGroup()
                             ci = Color(*color)
                             li = Line(
                                 points=points,
@@ -574,8 +1074,62 @@ def update():
                                 cap='round')
                             self.graphics_instructions.append((deepcopy(
                                 (color, width, points)), ci, li))
-                        i += 1
-            # print("STATS:", instrs, st_ch, st_n)
+                        for shape, pos, size, color in t._stamps:
+                            # if self.run_to_cursor:
+                            # color = *color[:3], 0.5
+                            with self.sandbox.canvas:
+                                Color(*color)
+                                if shape == 'Ellipse':
+                                    Ellipse(
+                                        pos=pos - 0.5 * Vec2d(size[0], size[1]),
+                                        size=(size[0], size[1]))
+                                elif shape == 'Rectangle':
+                                    Rectangle(
+                                        pos=pos - 0.5 * Vec2d(size[0], size[1]),
+                                        size=(size[0], size[1]))
+
+                        PushMatrix()
+                        size = t._shapesize
+                        Translate(*t._position)
+                        Scale(size)
+                        Rotate(angle=t.heading(), axis=(0, 0, 1), origin=(0, 0))
+                        Color(*t._pencolor)
+                        Triangle(points=[0, -10, 30, 0, 0, 10])
+                        PopMatrix()
+                    # for s in Sprite._instances:
+                    #     s.draw()
+                        # self.sandbox.add_widget(s)
+            else:
+                i = 0
+                instrs = len(self.graphics_instructions)
+                # st_ch = 0
+                # st_n = 0
+                with self.sandbox.canvas:
+                    for t in Turtle.turtles():
+                        for color, width, points in t._lines:
+                            if i < instrs:
+                                line, ci, li = self.graphics_instructions[i]
+                                # print(line)
+                                if line != (color, width, points):
+                                    # print("CHANGE", points, li.points)
+                                    li.points = points
+                                    self.graphics_instructions[i] = (deepcopy(
+                                        (color, width, points)), ci, li)
+                                    # st_ch += 1
+                            else:
+                                # st_n += 1
+                                ci = Color(*color)
+                                li = Line(
+                                    points=points,
+                                    width=width,
+                                    joint='round',
+                                    cap='round')
+                                self.graphics_instructions.append((deepcopy(
+                                    (color, width, points)), ci, li))
+                            i += 1
+                # print("STATS:", instrs, st_ch, st_n)
+        except Exception as e:
+            print('update_sandbox:', e)
 
     def compile_code(self, *largs):
         #        self._run_vars = defaultdict(lambda: defaultdict(list))
@@ -587,7 +1141,7 @@ def update():
 
         breakpoint = None
         if self.run_to_cursor:
-            breakpoint = self.init_editor.cursor_row + 2
+            breakpoint = self.init_editor.cursor_row + 1
 
         try:
             changed = self.runner.parse(self.init_code, breakpoint)
@@ -601,8 +1155,11 @@ def update():
             line_num = self.runner.exception_lineno(e)
             self.init_editor.highlight_line(line_num)
         else:
-            self.init_editor.highlight_line(None)
+            # self.init_editor.highlight_line(None)
             if COMMON_CODE in changed:
+                print('-='*30)
+                print(self.init_code)
+                print('-='*30)
                 self.trigger_exec()
                 changed.remove(COMMON_CODE)
             print('EXEC Changed', changed)
@@ -617,46 +1174,95 @@ def update():
         self.runner.reset(globals=self.vars)
         # self.runner.set_globals(self.vars, False)
         Turtle.clear_turtles()
-        Sprite.clear_sprites()
+        # Sprite.clear_sprites()  # FIXME
 
         turtle = Turtle()  # self.sandbox.add_turtle()
         self._the_turtle = turtle
-        for v in dir(turtle):
-            if v[0] != '_':
-                self.runner.globals[v] = getattr(turtle, v)
+        self._sokoban_level = Level('our', self._sokobal_level_number) # our
+        # draw_level(my_level.get_matrix())
+        self._sokoban_target_found = False
+        self._sokoban_dir = 'U'
+        self._sokoban_player_pos = self._sokoban_level.get_player_position()
+        # for v in dir(turtle):  # FIXME
+        #     if v[0] != '_':
+        #         self.runner.globals[v] = getattr(turtle, v)
 
         # self._run_vars = defaultdict(lambda: defaultdict(list))
         seed(123)
+        ok = False
         try:
-            self.runner.execute()
+            ok = self.runner.execute()
 
         except Exception as e:
             print('E2:', e)
-            line_num = self.runner.exception_lineno(e)
 
-            self.init_editor.highlight_line(line_num)
+        out = self.runner.text_stream.getvalue()
+        self.console = out
+        print('out:', out)
+        print('- ' * 40)
+        # self.init_editor.highlight_line(None)
+        watches = ''
+        for v, t, r in whos(self.runner.globals):
+            watches += f'{v}\t{t}\t{r}\n'
+
+        # FIXME: add scene spdiff
+        self.update_sandbox()
+
+
+        self.init_editor.highlight_line(None)
+        if not ok:
             if self.run_schedule:
                 Clock.unschedule(self.run_schedule)
+            if self.runner.traceback:
+                # print('STACK', self.runner.traceback.stack)
+                stack = None
+                for stack in self.runner.traceback.stack:
+                    if stack.filename == '<code-input>':
+                        watched_locals = whos(stack.locals)
+                        if watched_locals:
+                            watches += f'== {stack.name} ==\n'
+                            for v, t, r in watched_locals:
+                                watches += f'{v}\t{t}\t{r}\n'
+                        self.init_editor.highlight_line(stack.lineno, add=True)
+                        print('LINES +', stack.lineno, self.init_editor._highlight)
 
-        else:
+                # if not stack:
+                #     print('Unhandled 2')
+                #     self.init_editor.highlight_line(None)
+                # else:
+                #     if self.runner.traceback.exc_type is not Break:
+                #         # print("LINENO", stack.lineno)
+                #         self.init_editor.highlight_line(stack.lineno)
+                #     else:
+                #         self.init_editor.highlight_line(None)
 
-            out = self.runner.text_stream.getvalue()
-            self.textout.text = out
-            print('out:', out)
-            print('- ' * 40)
+                # stack = self.runner.traceback.stack[-1]
+                # line_num = self.runner.exception_lineno(e)
 
-            #            pass
-            self.init_editor.highlight_line(None)
-            # FIXME: add scene spdiff
-            self.update_sandbox()
+                # for k, v in stack.locals.items():
+                #     if k[0] != '_' and v[0] != '<':
+                #         watches += f'{k}\t{v[:40]}\n'
+                #         # print(k, type(v), repr(v)[:80], sep='\t')
+                #         # watches += f'{k}\t{type(v).__qualname__}\t{repr(v)[:80]}\n'
 
-            for k, v in self.runner.globals.items():
-                if any([isinstance(v, t) for t in [int, float, str, dict, tuple]]) and k[0] != '_':
-                    print(k, type(v), repr(v)[:80], sep='\t')
-            print('= ' * 40)
+            else:
+                print('Unhandled exception')
+                # self.init_editor.highlight_line(None) # FIXME
+        # else:
+            # self.init_editor.highlight_line(None)
+        # else:
 
-            if 'update' in self.runner.globals:
-                self.run_schedule = Clock.schedule_interval(self.trigger_exec_run, 1.0 / 60.0)
+        self.watches = watches
+        print('= ' * 40)
+
+
+        # for k, v in self.runner.globals.items():
+        #     if any([isinstance(v, t) for t in [int, float, str, dict, tuple]]) and k[0] != '_':
+        #         print(k, type(v), repr(v)[:80], sep='\t')
+        # print('= ' * 40)
+
+        if ok and 'update' in self.runner.globals:
+            self.run_schedule = Clock.schedule_interval(self.trigger_exec_run, 1.0 / 30.0)
 
 
     def execute_run(self, *largs):

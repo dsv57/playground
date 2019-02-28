@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 
 import ast
+import linecache
+from traceback import TracebackException, FrameSummary
 from io import StringIO
 from sys import getsizeof, exc_info #, modules
 from collections import defaultdict
@@ -32,6 +34,30 @@ COMMON_CODE='<common>'
 #        print(k, type(v), repr(v)[:80], sep='\t')
 
 #sys.getsizeof
+
+# Fix FrameSummary: store locals as it is, without doing repr().
+
+def _FrameSummary__init__(self, filename, lineno, name, *, lookup_line=True,
+            locals=None, line=None):
+        """Construct a FrameSummary.
+
+        :param lookup_line: If True, `linecache` is consulted for the source
+            code line. Otherwise, the line will be looked up when first needed.
+        :param locals: Frame locals.
+        :param line: If provided, use this instead of looking up the line in
+            the linecache.
+        """
+        self.filename = filename
+        self.lineno = lineno
+        self.name = name
+        self._line = line
+        if lookup_line:
+            self.line
+        self.locals = locals
+
+FrameSummary.__init__ = _FrameSummary__init__
+
+##########################################################################################
 
 _vars = defaultdict(lambda: defaultdict(list))
 
@@ -120,17 +146,32 @@ class AddBreak(ast.NodeTransformer):
             return ast.Raise(
                 exc=ast.Name(id='Break', ctx=ast.Load()), cause=None)
 
-        if hasattr(node, 'body'):
+        if not self.done and hasattr(node, 'body'): # FIXME and node.lineno <= self.lineno: # FIXME and node.body[-1].lineno >= self.lineno:
             new_body = []
             for i, child in enumerate(node.body):
-                if not self.done and child.lineno >= self.lineno:
+                new_body.append(child)
+                if child.lineno == self.lineno:  # or (not self.done and child.lineno >= self.lineno):  # child.lineno >= self.lineno:
                     self.done = True
                     newchild = ast.copy_location(
                         break_ast(child.lineno), child)
                     new_body.append(newchild)
-                new_body.append(child)
             node.body = new_body
-        return self.generic_visit(node) if not self.done else node
+
+            if not self.done:
+                node = self.generic_visit(node)
+                if not self.done:
+                    new_body = []
+                    for i, child in enumerate(node.body):
+                        new_body.append(child)
+                        if not self.done and child.lineno >= self.lineno:
+                            self.done = True
+                            newchild = ast.copy_location(
+                                break_ast(child.lineno), child)
+                            new_body.append(newchild)
+                    node.body = new_body
+
+        return node  # self.generic_visit(node)  # if not self.done else node
+        # return
 
 
 class VarLister(ast.NodeVisitor):
@@ -163,6 +204,7 @@ class CodeRunner:
 
     def reset(self, source=None, globals={}):
         self._breakpoint = None
+        self.traceback = None
         self.set_globals(globals, False)
         self.text_stream.close()
         self.text_stream = StringIO()
@@ -218,6 +260,8 @@ class CodeRunner:
         if breakpoint:
             AddBreak(breakpoint).visit(tree)
             ast.fix_missing_locations(tree)
+            print('PATCHED:', to_source(tree))
+            print('AST LINENO', breakpoint, ast.dump(tree, include_attributes=True))
 
         new_body = []
         new_ast = {}
@@ -251,6 +295,7 @@ class CodeRunner:
         if self.text_stream.closed:
             self.text_stream = StringIO()
         cobjs = self._codeobjs
+        self.traceback = None
         if parts is None:  # Preserving order: common first.
             parts = [COMMON_CODE] + list(set(cobjs.keys()) - set([COMMON_CODE]))
         for p in parts:
@@ -260,8 +305,19 @@ class CodeRunner:
                     with redirect_stderr(self.text_stream):
                         exec(cobjs[p], self._globals)
 
-            except Break:
+            except Break as e:
                 print("* Break *")
+                # print(traceback.format_exc())
+                self.traceback = TracebackException.from_exception(e, capture_locals=True)
+                return False
+
+            except Exception as e:
+                self.traceback = TracebackException.from_exception(e, capture_locals=True)
+                return False
+            # else:
+                # self.traceback = None
+
+        return True
 
     def call(self, func, *args, **kvargs):
         # if func not in self._globals:
