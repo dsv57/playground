@@ -75,7 +75,7 @@ class CodeEditor(CodeInput):
         self.hightlight_styles = {
             'error': (True, (.9, .1, .1, .4))
         }
-        self._highlight = defaultdict(lambda: [])
+        self._highlight = defaultdict(list)
         self._highlight['error'].append(3)
         self.namespace = {}
         self.ac_begin = False
@@ -205,7 +205,7 @@ class CodeEditor(CodeInput):
             if line_start > -1:
                 line = _text[line_start + 1:index]
                 indent = self.re_indent.match(line).group()
-                if line[-1] == ':':
+                if len(line) > 0 and line[-1] == ':':
                     indent += ' ' * self.tab_width
                 substring += indent
         return substring
@@ -709,13 +709,6 @@ down(3)
             print('update_sandbox:', e)
 
     def compile_code(self, *largs):
-        #        self._run_vars = defaultdict(lambda: defaultdict(list))
-        # print('= ' * 40)
-        # print(self.init_code)
-
-        # if self.run_schedule:
-        #     Clock.unschedule(self.run_schedule)
-
         breakpoint = None
         if self.run_to_cursor:
             breakpoint = self.init_editor.cursor_row + 1
@@ -732,7 +725,7 @@ down(3)
             line_num = self.runner.exception_lineno(e)
             self.init_editor.highlight_line(line_num)
         else:
-            # self.init_editor.highlight_line(None)
+            self.init_editor.highlight_line(None)
             if COMMON_CODE in changed:
                 print('-='*30)
                 print(self.init_code)
@@ -781,51 +774,39 @@ down(3)
         # FIXME: add scene spdiff
         self.update_sandbox()
 
-
-        self.init_editor.highlight_line(None)
+        # self.init_editor.highlight_line(None)
         if not ok:
             if self.run_schedule:
                 Clock.unschedule(self.run_schedule)
             if self.runner.traceback:
                 for l in self.runner.traceback.format(): 
-                    print(l[:120])
+                    print(l[:300])
                 # print('STACK', self.runner.traceback.stack)
                 stack = None
                 for stack in self.runner.traceback.stack:
                     if stack.filename == '<code-input>':
-                        watched_locals = whos(stack.locals)
-                        if watched_locals:
-                            watches += f'== {stack.name} ==\n'
-                            for v, t, r in watched_locals:
-                                watches += f'{v}\t{t}\t{r}\n'
+                        if stack.name != '<module>':
+                            watched_locals = whos(stack.locals)
+                            if watched_locals:
+                                watches += f'== {stack.name} ==\n'
+                                for v, t, r in watched_locals:
+                                    watches += f'{v}\t{t}\t{r}\n'
                         self.init_editor.highlight_line(stack.lineno, add=True)
                         print('LINES +', stack.lineno, self.init_editor._highlight)
 
-                # if not stack:
-                #     print('Unhandled 2')
-                #     self.init_editor.highlight_line(None)
-                # else:
-                #     if self.runner.traceback.exc_type is not Break:
-                #         # print("LINENO", stack.lineno)
-                #         self.init_editor.highlight_line(stack.lineno)
-                #     else:
-                #         self.init_editor.highlight_line(None)
-
-                # stack = self.runner.traceback.stack[-1]
-                # line_num = self.runner.exception_lineno(e)
-
-                # for k, v in stack.locals.items():
-                #     if k[0] != '_' and v[0] != '<':
-                #         watches += f'{k}\t{v[:40]}\n'
-                #         # print(k, type(v), repr(v)[:80], sep='\t')
-                #         # watches += f'{k}\t{type(v).__qualname__}\t{repr(v)[:80]}\n'
-
             else:
                 print('Unhandled exception')
-                # self.init_editor.highlight_line(None) # FIXME
+                self.init_editor.highlight_line(None) # FIXME
         # else:
             # self.init_editor.highlight_line(None)
-        # else:
+        else:
+            self.init_editor.highlight_line(None)
+            # player_pos = [-x * 36 for x in self.sokoban._player_pos]
+            if self.sokoban and self.sokoban.boxes_remaining == 0:
+                print('Level completed:', self.sokoban.level)
+                self.sokoban.level += 1
+                self.sandbox.clear_widgets()
+                # self.sokoban.draw_level(self.sandbox)
 
         self.watches = watches
         print('= ' * 40)
