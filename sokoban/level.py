@@ -2,12 +2,12 @@ from copy import deepcopy
 
 class Level:
 
-    def __init__(self,level_set,level_num):
+    def __init__(self, level_set, level_num):
         self.matrix = []
         self.matrix_history = []
         
         # Create level
-        with open('sokoban/levels/' + level_set + '/level' + str(level_num), 'r') as f:
+        with open(f'sokoban/levels/{level_set}/level{level_num}', 'r') as f:
             for row in f.read().splitlines():
                 self.matrix.append(list(row))
 

@@ -18,16 +18,26 @@ class Sokoban:
         self._tiles = None
         self.load_level(level, level_set)
 
-    def load_level(self, level=1, level_set=None):
+    def load_level(self, level=None, level_set=None):
+        if not level:
+            level = self._level_number
         if not level_set:
             level_set = self._level_set
         self._level = Level(level_set, level)
+        if self._tiles and (self._level_number != level or self._level_set != level_set):
+            self._tiles = None
         self._level_set = level_set
         self._level_number = level
         self._target_found = False
         self._player_pos = self._level.get_player_position()
-        if self._tiles and self._level_number != level or self._level_set != level_set:
-            self._tiles = None
+
+    @property
+    def level(self):
+        return self._level_number
+
+    @level.setter
+    def level(self, level):
+        self.load_level(level)
 
     def draw_level(self, layout):
         update = self._tiles is not None
@@ -51,13 +61,13 @@ class Sokoban:
                     layout.add_widget(tile)
 
     def move_player(self, dx, dy, steps=1):
-        my_level = self._level
+        level = self._level
         target_found = self._target_found
-        matrix = my_level.get_matrix()
+        matrix = level.get_matrix()
         # for row in reversed(matrix):
             # print(''.join(row))
 
-        my_level.add_to_history(matrix)
+        level.add_to_history(matrix)
 
         if steps < 0:
             dx = -dx
@@ -99,10 +109,14 @@ class Sokoban:
             # print('STEP', dx, dy, steps)
             steps -= 1
 
-        # print("Boxes remaining: " + str(len(my_level.get_boxes())))
-
-        if len(my_level.get_boxes()) == 0:
-            print("Level Completed")
-            self.load_level(self._level_number + 1)
+        # print("Boxes remaining: " + str(len(level.get_boxes())))
+        # return len(level.get_boxes()) == 0
+        # if len(level.get_boxes()) == 0:
+            # print("Level Completed")
+            # self.load_level(self._level_number + 1)
             # self.sandbox.clear_widgets()
             # self.draw_level()
+
+    @property
+    def boxes_remaining(self):
+        return len(self._level.get_boxes())
