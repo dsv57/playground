@@ -43,7 +43,7 @@ import pymunk
 from ourturtle import Turtle, Vec2d
 from sprite import Sprite, OurImage
 from codean import autocomp, CodeRunner, Break, COMMON_CODE
-from sokoban.level import Level
+from sokoban.sokoban import Sokoban
 
 try:
     import mycolors
@@ -542,31 +542,15 @@ down(3)
         except:
             pass
 
-        wall = 'sokoban/images/wall.png'
-        box = 'sokoban/images/box.png'
-        box_on_target = 'sokoban/images/box_on_target.png'
-        space = 'sokoban/images/space.png'
-        target = 'sokoban/images/target.png'
-        player = 'sokoban/images/player.png'
-        # player = 'sokoban/images/beetle-robot.png'
-        self._sokoban_images = {'#': wall, ' ': space, '$': box, '.': target, '@': player, '*': box_on_target}
-
-        self._sokobal_level_number = 1
-        self._sokoban_level = Level('our', 1)
-        self._sokoban_tiles = None
-        # draw_level(my_level.get_matrix())
-        self._sokoban_target_found = False
-        self._sokoban_dir = 'U'
-        self._sokoban_player_pos = self._sokoban_level.get_player_position()
-
-        def sokoban_go(direction):
+        self.sokoban = Sokoban()
+        def sokoban_go(dx, dy):
             def go(steps=1):
-                self.sokoban_move_player(direction, steps)
+                self.sokoban.move_player(dx, dy, steps)
             return go
-        globs['right'] = sokoban_go('R')
-        globs['left'] = sokoban_go('L')
-        globs['up'] = sokoban_go('U')
-        globs['down'] = sokoban_go('D')
+        globs['right'] = sokoban_go(1, 0)
+        globs['left'] = sokoban_go(-1, 0)
+        globs['up'] = sokoban_go(0, 1)
+        globs['down'] = sokoban_go(0, -1)
         # globs['right'] = lambda: self.sokoban_turn(1) # setattr(self, '_sokoban_dir', {'R': 'D', 'L': 'U', 'U': 'R', 'D': 'L'}[self._sokoban_dir])
         # globs['left'] = lambda: self.sokoban_turn(-1) # setattr(self, '_sokoban_dir', {'R': 'U', 'L': 'D', 'U': 'L', 'D': 'R'}[self._sokoban_dir])
         # globs['forward'] = self.sokoban_move_player
@@ -630,414 +614,7 @@ down(3)
         self.trigger_exec_run = Clock.create_trigger(self.execute_run, -1)
         self.run_schedule = None  # Clock.schedule_interval(self.trigger_exec_run, 1.0 / 60.0)
 
-    def sokoban_turn(self, dir):
-        if dir == 1:
-            self._sokoban_dir = {'R': 'D', 'L': 'U', 'U': 'R', 'D': 'L'}[self._sokoban_dir]
-        else:
-            self._sokoban_dir = {'R': 'U', 'L': 'D', 'U': 'L', 'D': 'R'}[self._sokoban_dir]
 
-    def sokoban_draw_level(self, update=False):
-        images = self._sokoban_images
-        matrix = self._sokoban_level.get_matrix()
-        if not update:
-            self._sokoban_tiles = []
-        for i, row in enumerate(matrix):
-            if not update:
-                self._sokoban_tiles.append([])
-            for j, c in enumerate(row):
-                # rot = {'R': -90, 'L': 90, 'U': 0, 'D': 180}[self._sokoban_dir] if c == '@' else 0
-                if update:
-                    tile = self._sokoban_tiles[i][j]
-                    image = tile.shapes[0]
-                    if image.source != images[c]:
-                        image.source = images[c]
-                        # tile.clear_widgets()
-                        # img = Image(source=images[c])
-                        # tile.add_widget(img)
-                        # tile.shapes[0] = img
-                        # with self._sokoban_tiles[i][j].canvas:
-                        #     Color(1,0,0)
-                        #     Rectangle(pos=(0, 0), size=(20,20))
-                        # with self._sokoban_tiles[i][j].canvas.after:
-                        #     Color(1,0,0)
-                        #     Rectangle(pos=(0, 0), size=(10,20))
-
-                        # self._sokoban_tiles[i][j].x += 10
-                        # self._sokoban_tiles[i][j].position = (30, 30)
-                        # image.reload()
-                        print('Reload', images[c])
-
-                    # print('Upd:', self._sokoban_tiles[i][j].shapes[0].source, images[c])
-                    # self._sokoban_tiles[i][j].shapes[0].source = images[c]
-                else:
-                    tile = Sprite(images[c], x=36*j, y=36*(len(matrix)-i), trace=False)
-                    self._sokoban_tiles[-1].append(tile)
-                    self.sandbox.add_widget(tile) # Sprite(images[c], x=36*j, y=36*(len(matrix)-i), trace=False)) # rotation=0,
-
-    def sokoban_move_player(self, direction, steps=1):
-        # direction = self._sokoban_dir
-        my_level = self._sokoban_level
-        target_found = self._sokoban_target_found
-        matrix = my_level.get_matrix()
-
-        my_level.add_to_history(matrix)
-
-        # print boxes
-        # print(my_level.get_boxes())
-
-        if steps < 0:
-            direction = {'R': 'L', 'L': 'R', 'U': 'D', 'D': 'U'}[direction]
-            steps = -steps
-
-        while steps > 0:
-            x, y = self._sokoban_player_pos
-            # print('target_found 1', target_found)
-
-            if direction == "L":
-                # print("######### Moving Left #########")
-
-                # if is_space
-                if matrix[y][x-1] == " ":
-                    # print("OK Space Found")
-                    matrix[y][x-1] = "@"
-                    self._sokoban_player_pos = (x-1, y)
-                    if target_found == True:
-                        matrix[y][x] = "."
-                        target_found = False
-                    else:
-                        matrix[y][x] = " "
-
-                # if is_box
-                elif matrix[y][x-1] == "$":
-                    # print("Box Found")
-                    if matrix[y][x-2] == " ":
-                        matrix[y][x-2] = "$"
-                        matrix[y][x-1] = "@"
-                        self._sokoban_player_pos = (x-1, y)
-                        if target_found == True:
-                            matrix[y][x] = "."
-                            target_found = False
-                        else:
-                            matrix[y][x] = " "
-                    elif matrix[y][x-2] == ".":
-                        matrix[y][x-2] = "*"
-                        matrix[y][x-1] = "@"
-                        self._sokoban_player_pos = (x-1, y)
-                        if target_found == True:
-                            matrix[y][x] = "."
-                            target_found = False
-                        else:
-                            matrix[y][x] = " "
-                    else:
-                        raise Exception('cannot go there')
-
-                # if is_box_on_target
-                elif matrix[y][x-1] == "*":
-                    # print("Box on target Found")
-                    if matrix[y][x-2] == " ":
-                        matrix[y][x-2] = "$"
-                        matrix[y][x-1] = "@"
-                        self._sokoban_player_pos = (x-1, y)
-                        if target_found == True:
-                            matrix[y][x] = "."
-                        else:
-                            matrix[y][x] = " "
-                        target_found = True
-
-                    elif matrix[y][x-2] == ".":
-                        matrix[y][x-2] = "*"
-                        matrix[y][x-1] = "@"
-                        self._sokoban_player_pos = (x-1, y)
-                        if target_found == True:
-                            matrix[y][x] = "."
-                        else:
-                            matrix[y][x] = " "
-                        target_found = True
-
-                    else:
-                        raise Exception('cannot go there')
-
-                # if is_target
-                elif matrix[y][x-1] == ".":
-                    # print("Target Found")
-                    matrix[y][x-1] = "@"
-                    self._sokoban_player_pos = (x-1, y)
-                    if target_found == True:
-                        matrix[y][x] = "."
-                    else:
-                        matrix[y][x] = " "
-                    target_found = True
-
-                # else
-                else:
-                    # print("There is a wall here")
-                    raise Exception('cannot go there')
-
-            elif direction == "R":
-                # print("######### Moving Right #########")
-
-                # if is_space
-                if matrix[y][x+1] == " ":
-                    # print("OK Space Found")
-                    matrix[y][x+1] = "@"
-                    self._sokoban_player_pos = (x+1, y)
-                    if target_found == True:
-                        matrix[y][x] = "."
-                        target_found = False
-                    else:
-                        matrix[y][x] = " "
-
-                # if is_box
-                elif matrix[y][x+1] == "$":
-                    # print("Box Found")
-                    if matrix[y][x+2] == " ":
-                        matrix[y][x+2] = "$"
-                        matrix[y][x+1] = "@"
-                        self._sokoban_player_pos = (x+1, y)
-                        if target_found == True:
-                            matrix[y][x] = "."
-                            target_found = False
-                        else:
-                            matrix[y][x] = " "
-
-                    elif matrix[y][x+2] == ".":
-                        matrix[y][x+2] = "*"
-                        matrix[y][x+1] = "@"
-                        self._sokoban_player_pos = (x+1, y)
-                        if target_found == True:
-                            matrix[y][x] = "."
-                            target_found = False
-                        else:
-                            matrix[y][x] = " "
-
-                    else:
-                        raise Exception('cannot go there')
-
-                # if is_box_on_target
-                elif matrix[y][x+1] == "*":
-                    # print("Box on target Found")
-                    if matrix[y][x+2] == " ":
-                        matrix[y][x+2] = "$"
-                        matrix[y][x+1] = "@"
-                        self._sokoban_player_pos = (x+1, y)
-                        if target_found == True:
-                            matrix[y][x] = "."
-                        else:
-                            matrix[y][x] = " "
-                        target_found = True
-
-                    elif matrix[y][x+2] == ".":
-                        matrix[y][x+2] = "*"
-                        matrix[y][x+1] = "@"
-                        self._sokoban_player_pos = (x+1, y)
-                        if target_found == True:
-                            matrix[y][x] = "."
-                        else:
-                            matrix[y][x] = " "
-                        target_found = True
-
-                    else:
-                        raise Exception('cannot go there')
-
-                # if is_target
-                elif matrix[y][x+1] == ".":
-                    # print("Target Found")
-                    matrix[y][x+1] = "@"
-                    self._sokoban_player_pos = (x+1, y)
-                    if target_found == True:
-                        matrix[y][x] = "."
-                    else:
-                        matrix[y][x] = " "
-                    target_found = True
-
-                # else
-                else:
-                    # print("There is a wall here")
-                    raise Exception('cannot go there')
-
-            elif direction == "D":
-                # print("######### Moving Down #########")
-
-                # if is_space
-                if matrix[y+1][x] == " ":
-                    # print("OK Space Found")
-                    matrix[y+1][x] = "@"
-                    self._sokoban_player_pos = (x, y+1)
-                    if target_found == True:
-                        matrix[y][x] = "."
-                        target_found = False
-                    else:
-                        matrix[y][x] = " "
-
-                # if is_box
-                elif matrix[y+1][x] == "$":
-                    # print("Box Found")
-                    if matrix[y+2][x] == " ":
-                        matrix[y+2][x] = "$"
-                        matrix[y+1][x] = "@"
-                        self._sokoban_player_pos = (x, y+1)
-                        if target_found == True:
-                            matrix[y][x] = "."
-                            target_found = False
-                        else:
-                            matrix[y][x] = " "
-
-                    elif matrix[y+2][x] == ".":
-                        matrix[y+2][x] = "*"
-                        matrix[y+1][x] = "@"
-                        self._sokoban_player_pos = (x, y+1)
-                        if target_found == True:
-                            matrix[y][x] = "."
-                            target_found = False
-                        else:
-                            matrix[y][x] = " "
-
-                    else:
-                        raise Exception('cannot go there')
-
-                # if is_box_on_target
-                elif matrix[y+1][x] == "*":
-                    # print("Box on target Found")
-                    if matrix[y+2][x] == " ":
-                        matrix[y+2][x] = "$"
-                        matrix[y+1][x] = "@"
-                        self._sokoban_player_pos = (x, y+1)
-                        if target_found == True:
-                            matrix[y][x] = "."
-                        else:
-                            matrix[y][x] = " "
-                        target_found = True
-
-                    elif matrix[y+2][x] == ".":
-                        matrix[y+2][x] = "*"
-                        matrix[y+1][x] = "@"
-                        self._sokoban_player_pos = (x, y+1)
-                        if target_found == True:
-                            matrix[y][x] = "."
-                        else:
-                            matrix[y][x] = " "
-                        target_found = True
-
-                    else:
-                        raise Exception('cannot go there')
-
-                # if is_target
-                elif matrix[y+1][x] == ".":
-                    # print("Target Found")
-                    matrix[y+1][x] = "@"
-                    self._sokoban_player_pos = (x, y+1)
-                    if target_found == True:
-                        matrix[y][x] = "."
-                    else:
-                        matrix[y][x] = " "
-                    target_found = True
-
-                # else
-                else:
-                    # print("There is a wall here")
-                    raise Exception('cannot go there')
-
-            elif direction == "U":
-                # print("######### Moving Up #########")
-
-                # if is_space
-                if matrix[y-1][x] == " ":
-                    # print("OK Space Found")
-                    matrix[y-1][x] = "@"
-                    self._sokoban_player_pos = (x, y-1)
-                    if target_found == True:
-                        matrix[y][x] = "."
-                        target_found = False
-                    else:
-                        matrix[y][x] = " "
-
-                # if is_box
-                elif matrix[y-1][x] == "$":
-                    # print("Box Found")
-                    if matrix[y-2][x] == " ":
-                        matrix[y-2][x] = "$"
-                        matrix[y-1][x] = "@"
-                        self._sokoban_player_pos = (x, y-1)
-                        if target_found == True:
-                            matrix[y][x] = "."
-                            target_found = False
-                        else:
-                            matrix[y][x] = " "
-
-                    elif matrix[y-2][x] == ".":
-                        matrix[y-2][x] = "*"
-                        matrix[y-1][x] = "@"
-                        self._sokoban_player_pos = (x, y-1)
-                        if target_found == True:
-                            matrix[y][x] = "."
-                            target_found = False
-                        else:
-                            matrix[y][x] = " "
-
-                    else:
-                        raise Exception('cannot go there')
-
-                # if is_box_on_target
-                elif matrix[y-1][x] == "*":
-                    # print("Box on target Found")
-                    if matrix[y-2][x] == " ":
-                        matrix[y-2][x] = "$"
-                        matrix[y-1][x] = "@"
-                        self._sokoban_player_pos = (x, y-1)
-                        if target_found == True:
-                            matrix[y][x] = "."
-                        else:
-                            matrix[y][x] = " "
-                        target_found = True
-
-                    elif matrix[y-2][x] == ".":
-                        matrix[y-2][x] = "*"
-                        matrix[y-1][x] = "@"
-                        self._sokoban_player_pos = (x, y-1)
-                        if target_found == True:
-                            matrix[y][x] = "."
-                        else:
-                            matrix[y][x] = " "
-                        target_found = True
-
-                    else:
-                        raise Exception('cannot go there')
-
-                # if is_target
-                elif matrix[y-1][x] == ".":
-                    # print("Target Found")
-                    matrix[y-1][x] = "@"
-                    self._sokoban_player_pos = (x, y-1)
-                    if target_found == True:
-                        matrix[y][x] = "."
-                    else:
-                        matrix[y][x] = " "
-                    target_found = True
-
-                # else
-                else:
-                    # print("There is a wall here")
-                    raise Exception('cannot go there')
-            # print('target_found 2', target_found)
-            self._sokoban_target_found = target_found
-            steps -= 1
-
-        # draw_level(matrix)
-
-        # print("Boxes remaining: " + str(len(my_level.get_boxes())))
-
-        if len(my_level.get_boxes()) == 0:
-            # my_environment.screen.fill((0, 0, 0))
-            print("Level Completed")
-            self._sokobal_level_number += 1
-            self._sokoban_level = Level('our', self._sokobal_level_number)
-            self._sokoban_tiles = None
-            self._sokoban_target_found = False
-            self.sandbox.clear_widgets()
-            self.sokoban_draw_level()
-            # global current_level
-            # current_level += 1
-            # init_level(level_set,current_level)
 
     def on_init_editor_cursor_row(self, *largs):
         if self.run_to_cursor:
@@ -1058,7 +635,7 @@ down(3)
                 for widget in saved:
                     self.sandbox.add_widget(widget)
 
-                self.sokoban_draw_level(self._sokoban_tiles is not None)
+                self.sokoban.draw_level(self.sandbox)
 
                 with self.sandbox.canvas:
                     for t in Turtle.turtles():
@@ -1178,11 +755,7 @@ down(3)
 
         turtle = Turtle()  # self.sandbox.add_turtle()
         self._the_turtle = turtle
-        self._sokoban_level = Level('our', self._sokobal_level_number) # our
-        # draw_level(my_level.get_matrix())
-        self._sokoban_target_found = False
-        self._sokoban_dir = 'U'
-        self._sokoban_player_pos = self._sokoban_level.get_player_position()
+        self.sokoban.load_level()
         # for v in dir(turtle):  # FIXME
         #     if v[0] != '_':
         #         self.runner.globals[v] = getattr(turtle, v)
@@ -1214,6 +787,8 @@ down(3)
             if self.run_schedule:
                 Clock.unschedule(self.run_schedule)
             if self.runner.traceback:
+                for l in self.runner.traceback.format(): 
+                    print(l[:120])
                 # print('STACK', self.runner.traceback.stack)
                 stack = None
                 for stack in self.runner.traceback.stack:
