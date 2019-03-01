@@ -6,6 +6,7 @@ import linecache
 from traceback import TracebackException, FrameSummary
 from io import StringIO
 from sys import getsizeof, exc_info #, modules
+from copy import deepcopy
 from collections import defaultdict
 from contextlib import redirect_stdout, redirect_stderr
 
@@ -37,25 +38,25 @@ COMMON_CODE='<common>'
 
 # Fix FrameSummary: store locals as it is, without doing repr().
 
-def _FrameSummary__init__(self, filename, lineno, name, *, lookup_line=True,
-            locals=None, line=None):
-        """Construct a FrameSummary.
+# def _FrameSummary__init__(self, filename, lineno, name, *, lookup_line=True,
+#             locals=None, line=None):
+#         """Construct a FrameSummary.
 
-        :param lookup_line: If True, `linecache` is consulted for the source
-            code line. Otherwise, the line will be looked up when first needed.
-        :param locals: Frame locals.
-        :param line: If provided, use this instead of looking up the line in
-            the linecache.
-        """
-        self.filename = filename
-        self.lineno = lineno
-        self.name = name
-        self._line = line
-        if lookup_line:
-            self.line
-        self.locals = locals
+#         :param lookup_line: If True, `linecache` is consulted for the source
+#             code line. Otherwise, the line will be looked up when first needed.
+#         :param locals: Frame locals.
+#         :param line: If provided, use this instead of looking up the line in
+#             the linecache.
+#         """
+#         self.filename = filename
+#         self.lineno = lineno
+#         self.name = name
+#         self._line = line
+#         if lookup_line:
+#             self.line
+#         self.locals = dict((k, deepcopy(v)) for k, v in locals.items()) if locals else None
 
-FrameSummary.__init__ = _FrameSummary__init__
+# FrameSummary.__init__ = _FrameSummary__init__
 
 ##########################################################################################
 
@@ -89,6 +90,7 @@ def compare_ast(node1, node2):
     else:
         return node1 == node2
 
+TRACE_MAX_DEPTH=12
 
 # dump ast.parse('dump_vars(locals(), n.lineno)').body[0]
 
@@ -204,7 +206,7 @@ class CodeRunner:
 
     def reset(self, source=None, globals={}):
         self._breakpoint = None
-        self.traceback = None
+        self.exception = None
         self.set_globals(globals, False)
         self.text_stream.close()
         self.text_stream = StringIO()
@@ -242,6 +244,38 @@ class CodeRunner:
             exc_tb = exc_tb.tb_next
 
         return lineno
+
+
+    def _trace(self, tb, max_depth=4):
+        out = []
+        # print('-----------------------')
+        depth = 0
+        while tb is not None:
+            f = tb.tb_frame  # inspect.currentframe()
+            # depth = 0
+            # while f is not None:
+            name = f.f_code.co_name
+            filename = f.f_code.co_filename
+            lineno = f.f_lineno
+            locals = f.f_locals
+            print(name, filename, lineno)
+            if depth > max_depth and filename != self._name:
+                break
+            if depth > TRACE_MAX_DEPTH:
+                break
+            # print('depth', depth, filename, lineno)
+            if filename == self._name:
+                locals = dict((k, deepcopy(v)) for k, v in locals.items()) if locals else None
+                line = linecache.getline(filename, lineno).strip() \
+                       or self._source.splitlines()[lineno-1].strip()
+                out.append((filename, lineno, name, line, locals))
+            depth += 1
+            # f = f.f_back
+            tb = tb.tb_next
+            # print('-----------------------')
+        return out
+
+
 
     def set_breakpoint(self, breakpoint):
         changed = self.parse(self._source, breakpoint)
@@ -295,7 +329,7 @@ class CodeRunner:
         if self.text_stream.closed:
             self.text_stream = StringIO()
         cobjs = self._codeobjs
-        self.traceback = None
+        self.exception = None
         if parts is None:  # Preserving order: common first.
             parts = [COMMON_CODE] + list(set(cobjs.keys()) - set([COMMON_CODE]))
         for p in parts:
@@ -305,14 +339,19 @@ class CodeRunner:
                     with redirect_stderr(self.text_stream):
                         exec(cobjs[p], self._globals)
 
-            except Break as e:
-                print("* Break *")
-                # print(traceback.format_exc())
-                self.traceback = TracebackException.from_exception(e, capture_locals=True)
-                return False
+            # except Break as e:
+            #     print("* Break *")
+            #     # print(traceback.format_exc())
+            #     self.traceback = self._trace(e.__traceback__)  # TracebackException.from_exception(e, capture_locals=True)
+            #     return False
 
             except Exception as e:
-                self.traceback = TracebackException.from_exception(e, capture_locals=True)
+                if hasattr(e, 'message'):
+                    e_str = e.message
+                else:
+                    e_str = str(e) or e.__class__.__name__
+                tb = self._trace(e.__traceback__)
+                self.exception = (e, e_str, tb)
                 return False
             # else:
                 # self.traceback = None

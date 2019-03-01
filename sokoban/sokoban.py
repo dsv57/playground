@@ -1,3 +1,5 @@
+import inspect
+
 from .level import Level
 from sprite import Sprite
 
@@ -6,7 +8,7 @@ class CannotGo(Exception):
 
 class Sokoban:
 
-    def __init__(self, level=1, level_set='our'):
+    def __init__(self, level=1, level_set='our', trace=True):
         wall = 'sokoban/images/wall.png'
         box = 'sokoban/images/box.png'
         box_on_target = 'sokoban/images/box_on_target.png'
@@ -16,9 +18,11 @@ class Sokoban:
         # player = 'sokoban/images/beetle-robot.png'
         self._images = {'#': wall, ' ': space, '$': box, '.': target, '@': player, '*': box_on_target}
         self._tiles = None
+        self._do_trace = trace
         self.load_level(level, level_set)
 
     def load_level(self, level=None, level_set=None):
+        self._trace = []
         if not level:
             level = self._level_number
         if not level_set:
@@ -61,6 +65,23 @@ class Sokoban:
                     layout.add_widget(tile)
 
     def move_player(self, dx, dy, steps=1):
+        if self._do_trace:
+            f = inspect.currentframe() 
+            tb = []
+            depth = 0
+            while f is not None:
+                filename = f.f_code.co_filename
+                lineno = f.f_lineno
+                if depth > 4 and filename != '<code-input>':
+                    break
+                # print('depth', depth, filename, lineno)
+                if filename == '<code-input>':
+                    tb.append(lineno)
+                depth += 1
+                f = f.f_back
+            self._trace.append(tb)
+            print('tb', tb)
+
         level = self._level
         target_found = self._target_found
         matrix = level.get_matrix()

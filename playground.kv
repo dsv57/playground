@@ -80,7 +80,7 @@
         
 <Playground>:
     sandbox: sandbox.__self__
-    init_editor: init_editor
+    code_editor: code_editor
     rpanel: rpanel
     textout: textout
 
@@ -98,10 +98,10 @@
                 orientation: 'vertical'
 
                 CodeEditor:
-                    id: init_editor
+                    id: code_editor
                     style: 'monokai'
-                    text: root.init_code
-                    on_text: root.init_code = args[1]
+                    text: root.code
+                    on_text: root.code = args[1]
                     auto_indent: True
                     background_color: 0.153, 0.157, 0.133, 1
                     cursor_width: '2sp'
