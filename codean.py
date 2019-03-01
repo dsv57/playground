@@ -232,8 +232,6 @@ class CodeRunner:
         depth = 0
         while tb is not None:
             f = tb.tb_frame  # inspect.currentframe()
-            # depth = 0
-            # while f is not None:
             name = f.f_code.co_name
             filename = f.f_code.co_filename
             lineno = f.f_lineno
@@ -244,15 +242,19 @@ class CodeRunner:
             if depth > TRACE_MAX_DEPTH:
                 break
             # print('depth', depth, filename, lineno)
+            print('_trace1', name, filename == self._name, filename, lineno, repr(locals)[:120])
             if filename == self._name:
-                locals = dict((k, deepcopy(v)) for k, v in locals.items()) if locals else None
+                locals_copy = dict()
+                for k, v in locals.items():
+                    try:
+                        locals_copy[k] = deepcopy(v)
+                    except:
+                        pass
                 line = linecache.getline(filename, lineno).strip() \
                        or self._source.splitlines()[lineno-1].strip()
-                out.append((filename, lineno, name, line, locals))
+                out.append((filename, lineno, name, line, locals_copy))
             depth += 1
-            # f = f.f_back
             tb = tb.tb_next
-            # print('-----------------------')
         return out
 
     @property
