@@ -25,7 +25,7 @@
 #            joint: 'round'
 #            cap: 'round'
 #            width: 5
-    
+
 #    Ball:
 #        id: ball
 #        center: self.parent.center
@@ -35,7 +35,7 @@
     size_hint_y: None
     height: '32dp'
     rows: 1
-    
+
 #    TextInput:
 #        id: var
 #        text: root.var_name
@@ -59,7 +59,7 @@
         # input_filter: root.type
         size_hint: None, None
         height: '32dp'
-        width: '48dp' 
+        width: '48dp'
         multiline: False
     Slider:
         value: root.value
@@ -77,9 +77,10 @@
         height: '32dp'
         width: '48dp'
         multiline: False
-        
+
 <Playground>:
     sandbox: sandbox.__self__
+    replay_slider: replay_slider
     code_editor: code_editor
     rpanel: rpanel
     textout: textout
@@ -92,7 +93,7 @@
             size_hint: (None, 1)
             min_size: 300
             width: 450
-            
+
         #               #ScrollView: https://github.com/kivy/kivy/issues/1449
             BoxLayout:
                 orientation: 'vertical'
@@ -131,6 +132,16 @@
                         spacing: 5
                         padding: 5
 
+                        Slider:
+                            id: replay_slider
+                            value: root.replay_step
+                            on_value: root.replay_step = int(args[1])
+                            min: 0
+                            max: 0
+                            step: 1
+                            height: '32dp'
+                            size_hint: 1, None
+
                         TextInput:
                             id: watches_label
                             font_name: '/usr/lib/python3/dist-packages/kivy/data/fonts/RobotoMono-Regular.ttf'
@@ -143,17 +154,17 @@
                             text: root.watches
                             size_hint_y: 1
 
-    
+
         BoxLayout:
             orientation: 'vertical' # 'horizontal' if root.width >= 1024 else 'vertical'
-            
+
             MapViewer:
                 OurSandbox:
                     id: sandbox
                     min_size: 200
                     pos: Vector(self.parent.size)*0.5+Vector(self.parent.pos)
                     size_hint: (.6, None) if self.width < self.height else (None, .6)
-    
+
             Splitter:
                 id: sandbox_pane
                 sizable_from: 'top' # if self.vertical else 'left'
@@ -162,7 +173,7 @@
                 size_hint: (1, .5) if self.vertical else (.5, 1)
                 min_size: 200
                 # width: 200
-                                                                    
+
                 TextInput:
                     id: textout
                     font_name: '/usr/lib/python3/dist-packages/kivy/data/fonts/RobotoMono-Regular.ttf'
@@ -175,9 +186,9 @@
                     text: root.console
                     size_hint_y: 1
 
-                        
 
-            
 
-            
-    
+
+
+
+

@@ -557,7 +557,9 @@ down(3)
 
     console = StringProperty('')
     watches = StringProperty('')
+    replay_step = NumericProperty(0)
 
+    replay_slider = ObjectProperty(None)
     sandbox = ObjectProperty(None)
     code_editor = ObjectProperty(None)
     rpanel = ObjectProperty(None)
@@ -672,7 +674,10 @@ down(3)
         self.trigger_exec_run = Clock.create_trigger(self.execute_run, -1)
         self.run_schedule = None  # Clock.schedule_interval(self.trigger_exec_run, 1.0 / 60.0)
 
-
+    def on_replay_step(self, *largs):
+        if self.sokoban:
+            self.sokoban.replay(self.replay_step)
+            self.update_sandbox()
 
     def on_code_editor_cursor_row(self, *largs):
         if self.run_to_cursor:
@@ -833,6 +838,9 @@ down(3)
 
         # FIXME: add scene spdiff
         self.update_sandbox()
+        if self.sokoban:
+            self.replay_slider.max = len(self.sokoban.log)
+            self.replay_slider.value = len(self.sokoban.log)
 
         # self.code_editor.highlight_line(None)
         if not ok:
