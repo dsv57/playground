@@ -139,41 +139,21 @@ class AddBreak(ast.NodeTransformer):
         super(AddBreak, self).__init__(**kvargs)
 
     def visit(self, node):
-        # print('lineno', getattr(node, 'lineno', None))
-        # try:
-        #     print(repr(astor.to_source(node)))
-        # except:
-        #     print('---')
         def break_ast(lineno):
             return ast.Raise(
                 exc=ast.Name(id='Break', ctx=ast.Load()), cause=None)
 
-        if not self.done and hasattr(node, 'body'): # FIXME and node.lineno <= self.lineno: # FIXME and node.body[-1].lineno >= self.lineno:
+        if not self.done and hasattr(node, 'body'):  # FIXME and node.lineno <= self.lineno: # FIXME and node.body[-1].lineno >= self.lineno:
             new_body = []
             for i, child in enumerate(node.body):
-                new_body.append(child)
-                if child.lineno == self.lineno:  # or (not self.done and child.lineno >= self.lineno):  # child.lineno >= self.lineno:
+                new_body.append(self.visit(child))
+                if not self.done and child.lineno >= self.lineno:  # or (not self.done and child.lineno >= self.lineno):  # child.lineno >= self.lineno:
                     self.done = True
                     newchild = ast.copy_location(
                         break_ast(child.lineno), child)
                     new_body.append(newchild)
             node.body = new_body
-
-            if not self.done:
-                node = self.generic_visit(node)
-                if not self.done:
-                    new_body = []
-                    for i, child in enumerate(node.body):
-                        new_body.append(child)
-                        if not self.done and child.lineno >= self.lineno:
-                            self.done = True
-                            newchild = ast.copy_location(
-                                break_ast(child.lineno), child)
-                            new_body.append(newchild)
-                    node.body = new_body
-
         return node  # self.generic_visit(node)  # if not self.done else node
-        # return
 
 
 class VarLister(ast.NodeVisitor):
@@ -199,13 +179,13 @@ class CodeRunner:
         self._codeobjs = {}
         self._common_vars = set()
         self._globals = {}
+        self._breakpoint = None
         self.default_globals = {'Break': Break}
         self.default_globals.update(globals)
         self.text_stream = StringIO()
         self.reset(source)
 
     def reset(self, source=None, globals={}):
-        self._breakpoint = None
         self.exception = None
         self.set_globals(globals, False)
         self.text_stream.close()
@@ -275,12 +255,15 @@ class CodeRunner:
             # print('-----------------------')
         return out
 
+    @property
+    def breakpoint(self):
+        return self._breakpoint
 
-
-    def set_breakpoint(self, breakpoint):
+    @breakpoint.setter
+    def breakpoint(self, breakpoint):
         changed = self.parse(self._source, breakpoint)
         self.compile(changed)
-        return changed
+        # return changed
 
     def parse(self, source, breakpoint=None):
         tree = ast.parse(source)
@@ -294,8 +277,12 @@ class CodeRunner:
         if breakpoint:
             AddBreak(breakpoint).visit(tree)
             ast.fix_missing_locations(tree)
-            print('PATCHED:', to_source(tree))
-            print('AST LINENO', breakpoint, ast.dump(tree, include_attributes=True))
+            for i, l in enumerate(source.splitlines()):
+                print(i, l)
+            print('PATCHED:', breakpoint) #, to_source(tree))
+            for l in to_source(tree).splitlines():
+                print('=', l)
+            # print('AST LINENO', breakpoint, ast.dump(tree, include_attributes=True))
 
         new_body = []
         new_ast = {}

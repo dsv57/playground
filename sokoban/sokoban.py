@@ -50,7 +50,6 @@ class Sokoban:
         self._log_pos = start
         for dx, dy, steps, trace in self._log[start:pos]:
             self.move_player(dx, dy, steps, nolog=True)
-        print(2222, start, pos, self._log_pos)
         return trace
 
     @property

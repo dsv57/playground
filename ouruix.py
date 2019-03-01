@@ -73,10 +73,11 @@ class CodeEditor(CodeInput):
     def __init__(self, **kwargs):
         # self._highlight_line = None
         self.hightlight_styles = {
-            'error': (True, (.9, .1, .1, .4))
+            'error': (True, (.9, .1, .1, .4)),
+            'run': (False, (.1, .9, .1, 1.0))
         }
         self._highlight = defaultdict(set)
-        self._highlight['error'].add(3)
+        # self._highlight['run'].add(3)
         self.namespace = {}
         self.ac_begin = False
         self.ac_current = 0
@@ -96,9 +97,14 @@ class CodeEditor(CodeInput):
     def highlight_line(self, line_num, style='error', add=False):
         if line_num:
             if add:
-                self._highlight[style].add(line_num)
+                if isinstance(line_num, int):
+                    self._highlight[style].add(line_num)
+                else:
+                    self._highlight[style].update(line_num)
             else:
-                self._highlight[style] = set([line_num])
+                if isinstance(line_num, int):
+                    line_num = [line_num]
+                self._highlight[style] = set(line_num)
         else:
             self._highlight[style].clear()
         self._trigger_update_graphics()
@@ -123,7 +129,6 @@ class CodeEditor(CodeInput):
                 # pass only the selection lines[]
                 # passing all the lines can get slow when dealing with a lot of text
                 y -= line_num * dy
-                highlight_color = (.9, .1, .1, .5)
                 if miny <= y <= maxy + dy:
                     self._draw_highlight(line_num, style)
         self._position_handles('both')
@@ -163,7 +168,7 @@ class CodeEditor(CodeInput):
             else:
                 Line(
                     rounded_rectangle=(x1, pos[1], x2 - x1, size[1], 4),
-                    width=1.3, group=group)
+                    group=group)
         # self.canvas.add(
         #     Line(rounded_rectangle=(x1, pos[1], x2 - x1, size[1], 4), width=1.3, group='highlight'))
 
@@ -575,8 +580,7 @@ down(3)
 
         globs = dict()
         for v in 'random randint uniform choice seed sin cos atan2 \
-                sqrt ceil floor degrees radians log exp'.split(
-        ):
+                sqrt ceil floor degrees radians log exp'.split():
             globs[v] = eval(v)
 
         def _dump_vars(v, lineno):
@@ -676,8 +680,9 @@ down(3)
 
     def on_replay_step(self, *largs):
         if self.sokoban:
-            self.sokoban.replay(self.replay_step)
+            code_lines = self.sokoban.replay(self.replay_step)
             self.update_sandbox()
+            self.code_editor.highlight_line(code_lines, 'run')
 
     def on_code_editor_cursor_row(self, *largs):
         if self.run_to_cursor:
@@ -786,6 +791,7 @@ down(3)
             print('E:', e)
             print('* ' * 40)
             line_num = self.runner.exception_lineno(e)
+            self.code_editor.highlight_line(None, 'run')
             self.code_editor.highlight_line(line_num)
             self._status = 'COMPILE_ERROR'
         else:
@@ -844,7 +850,6 @@ down(3)
 
         # self.code_editor.highlight_line(None)
         if not ok:
-            self._status = 'EXEC_ERROR'
             if self.run_schedule:
                 Clock.unschedule(self.run_schedule)
             if self.runner.exception:
@@ -854,6 +859,16 @@ down(3)
                 # stack = None
                 exc, exc_str, traceback = self.runner.exception
                 print('EXC:', exc_str)
+                is_break = isinstance(exc, Break)
+                if is_break:
+                    self._status = 'BREAK'
+                    hl_style = 'run'
+                else:
+                    self._status = 'EXEC_ERROR'
+                    hl_style = 'error'
+                # print('Br Line:', self.runner.breakpoint)
+                self.code_editor.highlight_line(None)
+                # self.code_editor.highlight_line(self.runner.breakpoint, 'run')
                 for filename, lineno, name, line, locals in traceback:
                     print('TRACE:', repr(line)) # filename, lineno, name, line, locals)
                     if filename == '<code-input>':
@@ -863,10 +878,11 @@ down(3)
                                 watches += f'== {name} ==\n'
                                 for v, t, r in watched_locals:
                                     watches += f'{v}\t{t}\t{r}\n'
-                        self.code_editor.highlight_line(lineno, add=True)
+                        self.code_editor.highlight_line(lineno, hl_style, add=True)
                         # print('LINES +', lineno, self.code_editor._highlight)
 
             else:
+                self._status = 'EXEC_ERROR'
                 print('Unhandled exception')
                 self.code_editor.highlight_line(None) # FIXME
         # else:
