@@ -75,8 +75,8 @@ class CodeEditor(CodeInput):
         self.hightlight_styles = {
             'error': (True, (.9, .1, .1, .4))
         }
-        self._highlight = defaultdict(list)
-        self._highlight['error'].append(3)
+        self._highlight = defaultdict(set)
+        self._highlight['error'].add(3)
         self.namespace = {}
         self.ac_begin = False
         self.ac_current = 0
@@ -96,9 +96,9 @@ class CodeEditor(CodeInput):
     def highlight_line(self, line_num, style='error', add=False):
         if line_num:
             if add:
-                self._highlight[style].append(line_num)
+                self._highlight[style].add(line_num)
             else:
-                self._highlight[style] = [line_num]
+                self._highlight[style] = set([line_num])
         else:
             self._highlight[style].clear()
         self._trigger_update_graphics()
@@ -467,7 +467,7 @@ class Playground(FloatLayout):
 #   pass
 
 
-    init_code = StringProperty('''
+    code = StringProperty('''
 up()
 left(4)
 right()
@@ -502,7 +502,7 @@ down(3)
     watches = StringProperty('')
 
     sandbox = ObjectProperty(None)
-    init_editor = ObjectProperty(None)
+    code_editor = ObjectProperty(None)
     rpanel = ObjectProperty(None)
     textout = ObjectProperty(None)
     run_to_cursor = BooleanProperty(False)
@@ -565,7 +565,7 @@ down(3)
 
         self.runner = CodeRunner(globals=globs, special_funcs=['update'])
 
-        self.init_editor.namespace = self.runner.globals  # FIXME?
+        self.code_editor.namespace = self.runner.globals  # FIXME?
 
         # FIXME
         # vs1 = VarSlider(var_name='a', min=0, max=360, type='float')
@@ -581,11 +581,12 @@ down(3)
         # self.rpanel.add_widget(vs5, 1)
         # self.rpanel.add_widget(vs6, 1)
 
+        self._status = None
         self.steps = 0
         self.trigger_exec = Clock.create_trigger(self.execute_code, -1)
-        self.bind(init_code=self.compile_code)
+        self.bind(code=self.compile_code)
         self.bind(run_to_cursor=self.compile_code)
-        self.init_editor.bind(cursor_row=self.on_init_editor_cursor_row)
+        self.code_editor.bind(cursor_row=self.on_code_editor_cursor_row)
 
         def _set_var(wid, value):
             self.vars[wid.var_name] = value
@@ -616,7 +617,7 @@ down(3)
 
 
 
-    def on_init_editor_cursor_row(self, *largs):
+    def on_code_editor_cursor_row(self, *largs):
         if self.run_to_cursor:
             self.compile_code()
 
@@ -711,10 +712,10 @@ down(3)
     def compile_code(self, *largs):
         breakpoint = None
         if self.run_to_cursor:
-            breakpoint = self.init_editor.cursor_row + 1
+            breakpoint = self.code_editor.cursor_row + 1
 
         try:
-            changed = self.runner.parse(self.init_code, breakpoint)
+            changed = self.runner.parse(self.code, breakpoint)
             if COMMON_CODE in changed:
                 self.runner.reset()
 
@@ -723,12 +724,14 @@ down(3)
             print('E:', e)
             print('* ' * 40)
             line_num = self.runner.exception_lineno(e)
-            self.init_editor.highlight_line(line_num)
+            self.code_editor.highlight_line(line_num)
+            self._status = 'COMPILE_ERROR'
         else:
-            self.init_editor.highlight_line(None)
+            self._status = 'COMPILE_OK'
+            self.code_editor.highlight_line(None)
             if COMMON_CODE in changed:
                 print('-='*30)
-                print(self.init_code)
+                print(self.code)
                 print('-='*30)
                 self.trigger_exec()
                 changed.remove(COMMON_CODE)
@@ -758,15 +761,15 @@ down(3)
         ok = False
         try:
             ok = self.runner.execute()
-
         except Exception as e:
+            self._status = 'EXEC_ERROR'
             print('E2:', e)
 
         out = self.runner.text_stream.getvalue()
         self.console = out
         print('out:', out)
         print('- ' * 40)
-        # self.init_editor.highlight_line(None)
+        # self.code_editor.highlight_line(None)
         watches = ''
         for v, t, r in whos(self.runner.globals):
             watches += f'{v}\t{t}\t{r}\n'
@@ -774,33 +777,38 @@ down(3)
         # FIXME: add scene spdiff
         self.update_sandbox()
 
-        # self.init_editor.highlight_line(None)
+        # self.code_editor.highlight_line(None)
         if not ok:
+            self._status = 'EXEC_ERROR'
             if self.run_schedule:
                 Clock.unschedule(self.run_schedule)
-            if self.runner.traceback:
-                for l in self.runner.traceback.format(): 
-                    print(l[:300])
+            if self.runner.exception:
+                # for l in self.runner.traceback.format(): 
+                #     print(l[:300])
                 # print('STACK', self.runner.traceback.stack)
-                stack = None
-                for stack in self.runner.traceback.stack:
-                    if stack.filename == '<code-input>':
-                        if stack.name != '<module>':
-                            watched_locals = whos(stack.locals)
+                # stack = None
+                exc, exc_str, traceback = self.runner.exception
+                print('EXC:', exc_str)
+                for filename, lineno, name, line, locals in traceback:
+                    print('TRACE:', repr(line)) # filename, lineno, name, line, locals)
+                    if filename == '<code-input>':
+                        if name != '<module>':
+                            watched_locals = whos(locals)
                             if watched_locals:
-                                watches += f'== {stack.name} ==\n'
+                                watches += f'== {name} ==\n'
                                 for v, t, r in watched_locals:
                                     watches += f'{v}\t{t}\t{r}\n'
-                        self.init_editor.highlight_line(stack.lineno, add=True)
-                        print('LINES +', stack.lineno, self.init_editor._highlight)
+                        self.code_editor.highlight_line(lineno, add=True)
+                        # print('LINES +', lineno, self.code_editor._highlight)
 
             else:
                 print('Unhandled exception')
-                self.init_editor.highlight_line(None) # FIXME
+                self.code_editor.highlight_line(None) # FIXME
         # else:
-            # self.init_editor.highlight_line(None)
+            # self.code_editor.highlight_line(None)
         else:
-            self.init_editor.highlight_line(None)
+            self._status = 'EXEC_OK'
+            self.code_editor.highlight_line(None)
             # player_pos = [-x * 36 for x in self.sokoban._player_pos]
             if self.sokoban and self.sokoban.boxes_remaining == 0:
                 print('Level completed:', self.sokoban.level)
@@ -811,7 +819,7 @@ down(3)
         self.watches = watches
         print('= ' * 40)
 
-
+        # print("highlight", self.code_editor._highlight)
         # for k, v in self.runner.globals.items():
         #     if any([isinstance(v, t) for t in [int, float, str, dict, tuple]]) and k[0] != '_':
         #         print(k, type(v), repr(v)[:80], sep='\t')
