@@ -204,19 +204,14 @@ class CodeEditor(CodeInput):
     def _auto_indent(self, substring):
         index = self.cursor_index()
         _text = self._get_text(encode=False)
-        print(111, index)
         if index > 0:
             line_start = _text.rfind('\n', 0, index)
-            # print('_auto_indent', repr(index), repr(_text), repr(line_start), repr(_text[line_start + 1:index]))
             if line_start > -1:
                 line = _text[line_start + 1:index]
-                print(333, line)
                 indent = self.re_indent.match(line).group()
-                if len(line) > 0 and line[-1] == ':':
-                    indent += ' ' * self.tab_width
                 substring += indent
-            else:
-                substring += ' ' * self.tab_width
+        if len(_text) > 0 and _text[-1] == ':':
+            substring += ' ' * self.tab_width
         return substring
 
     def do_backspace(self, from_undo=False, mode='bkspc'):
@@ -530,16 +525,6 @@ class Playground(FloatLayout):
 
 
     code = StringProperty('''
-up()
-left(4)
-right()
-up(3)
-left()
-up()
-left(2)
-down()
-left(2)
-down(3)
 ''')
 
       # print(123)
@@ -870,7 +855,7 @@ down(3)
                 self.code_editor.highlight_line(None)
                 # self.code_editor.highlight_line(self.runner.breakpoint, 'run')
                 for filename, lineno, name, line, locals in traceback:
-                    print('TRACE:', repr(line)) # filename, lineno, name, line, locals)
+                    print('TRACE:', filename, lineno, name, repr(line), repr(locals)[:80]) # filename, lineno, name, line, locals)
                     if filename == '<code-input>':
                         if name != '<module>':
                             watched_locals = whos(locals)
