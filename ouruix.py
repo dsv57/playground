@@ -199,16 +199,44 @@ class CodeEditor(CodeInput):
     def _auto_indent(self, substring):
         index = self.cursor_index()
         _text = self._get_text(encode=False)
+        print(111, index)
         if index > 0:
             line_start = _text.rfind('\n', 0, index)
             # print('_auto_indent', repr(index), repr(_text), repr(line_start), repr(_text[line_start + 1:index]))
             if line_start > -1:
                 line = _text[line_start + 1:index]
+                print(333, line)
                 indent = self.re_indent.match(line).group()
                 if len(line) > 0 and line[-1] == ':':
                     indent += ' ' * self.tab_width
                 substring += indent
+            else:
+                substring += ' ' * self.tab_width
         return substring
+
+    def do_backspace(self, from_undo=False, mode='bkspc'):
+        # Clever backspace: remove up to previous indent level.
+        if self.readonly:
+            return
+        cc, cr = self.cursor
+        _lines = self._lines
+        text = _lines[cr]
+        cursor_index = self.cursor_index()
+        tab = self.tab_width
+        if cc > 0 and text[:cc].lstrip() == '':
+            indent = (cc - 1) // tab
+            remove = cc - indent * tab
+            new_text = ' ' * indent * tab + text[cc:]
+            substring = ' ' * remove
+            self._set_line_text(cr, new_text)
+            self.cursor = self.get_cursor_from_index(cursor_index - remove)
+            # handle undo and redo
+            self._set_undo_redo_bkspc(
+                cursor_index,
+                cursor_index - remove,
+                substring, from_undo)
+            return
+        super(CodeEditor, self).do_backspace(from_undo, mode)
 
     def keyboard_on_key_down(self, window, keycode, text, modifiers):
         # print('keyboard_on_key_down', keycode, text, modifiers)
@@ -218,13 +246,42 @@ class CodeEditor(CodeInput):
             cc, cr = self.cursor
             _lines = self._lines
             text = _lines[cr]
+            before_cursor = text[:cc].lstrip()
+            tab = self.tab_width
             # cursor_index = self.cursor_index()
             # text_last_line = _lines[cr - 1]
             # print(111, repr(text[:cc]), repr(text[cc:]))
-            if text[:cc].lstrip() == '' and not modifiers:
-                self.insert_text('    ')
+            if self._selection and modifiers in [[], ['shift']]:
+                a, b = self._selection_from, self._selection_to
+                cc_from, cr_from = self.get_cursor_from_index(a)
+                cc_to, cr_to = self.get_cursor_from_index(b)
+                for cr in range(min(cr_from, cr_to), max(cr_from, cr_to) + 1):
+                    line = _lines[cr]
+                    if not modifiers:
+                        new_text = ' ' * tab + line
+                        self._set_line_text(cr, new_text)
+                        if cr == cr_from: cc_from += tab
+                        if cr == cr_to: cc_to += tab
+                    else:
+                        spaces = len(line) - len(line.lstrip())
+                        indent = (spaces - 1) // tab
+                        if indent >= 0:
+                            remove = spaces - indent * tab
+                            new_text = line[remove:]
+                            self._set_line_text(cr, new_text)
+                            if cr == cr_from: cc_from -= remove
+                            if cr == cr_to: cc_to -= remove
+                self._selection_from = self.cursor_index((cc_from, cr_from))
+                self._selection_to = self.cursor_index((cc_to, cr_to))
+                self._selection_finished = True
+                self._update_selection(True)
+                self._update_graphics_selection()
+                return True
+            elif not self._selection and before_cursor == '' and not modifiers:
+                self.insert_text(' ' * tab)
                 self.ac_begin = False
-            else:
+                return True
+            elif not self._selection and before_cursor != '' and not modifiers:
                 # print("AC", self.ac_begin, cc, cr, self.ac_position, self.ac_current, self.ac_completions)
                 if self.ac_begin:
                     if self.ac_completions[self.ac_current].complete:
@@ -249,7 +306,7 @@ class CodeEditor(CodeInput):
                     ac = self.ac_completions[self.ac_current]
                     self.insert_text(ac.complete)
                     # self.ac_state[2] = len(ac.complete)
-            return True
+                return True
 
         elif modifiers == ['alt'] and key_str in ['up', 'down', 'right', 'left']:
             print(self._lines)
@@ -783,7 +840,7 @@ down(3)
             if self.run_schedule:
                 Clock.unschedule(self.run_schedule)
             if self.runner.exception:
-                # for l in self.runner.traceback.format(): 
+                # for l in self.runner.traceback.format():
                 #     print(l[:300])
                 # print('STACK', self.runner.traceback.stack)
                 # stack = None
