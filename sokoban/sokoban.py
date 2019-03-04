@@ -123,7 +123,12 @@ class Sokoban:
 
             orig_tile = matrix[y][x]
             next_tile = matrix[y + dy][x + dx]
-            second_tile = matrix[y + 2 * dy][x + 2 * dx]
+            if len(matrix) < y + 2 * dy:
+                second_tile = '#'
+            elif len(matrix[y + 2 * dy]) < x + 2 * dx:
+                second_tile = '#'
+            else:
+                second_tile = matrix[y + 2 * dy][x + 2 * dx]
             if next_tile in ' .':
                 pass
             elif next_tile in '$*':
@@ -153,7 +158,8 @@ class Sokoban:
             self._target_found = target_found
             matrix[y][x] = orig_tile
             matrix[y + dy][x + dx] = next_tile
-            matrix[y + 2 * dy][x + 2 * dx] = second_tile
+            if len(matrix) >= y + 2 * dy and len(matrix[y + 2 * dy]) >= x + 2 * dx:
+                matrix[y + 2 * dy][x + 2 * dx] = second_tile
 
             # print('STEP', dx, dy, steps)
             steps -= 1
