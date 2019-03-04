@@ -22,10 +22,12 @@ from kivy.uix.behaviors import FocusBehavior
 from kivy.uix.codeinput import CodeInput
 from kivy.uix.widget import Widget
 from kivy.uix.image import Image
+from kivy.uix.actionbar import ActionItem
 from kivy.uix.stencilview import StencilView
 from kivy.uix.scatter import ScatterPlane
 from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.gridlayout import GridLayout
+from kivy.uix.boxlayout import BoxLayout
 from kivy.graphics import Color, Line, Rectangle, Ellipse, Triangle, \
         PushMatrix, PopMatrix, RoundedRectangle
 from kivy.graphics.transformation import Matrix
@@ -68,6 +70,10 @@ def whos(vars, max_repr=40):
             for k, v in vars.items()
             if isinstance(v, w_types) and k[0] != '_']
 
+
+class ActionStepSlider(BoxLayout, ActionItem):
+    step = NumericProperty(0)
+    max_step = NumericProperty(0)
 
 class CodeEditor(CodeInput):
     def __init__(self, **kwargs):
@@ -548,8 +554,8 @@ class Playground(FloatLayout):
     console = StringProperty('')
     watches = StringProperty('')
     replay_step = NumericProperty(0)
+    replay_steps = NumericProperty(0)
 
-    replay_slider = ObjectProperty(None)
     sandbox = ObjectProperty(None)
     code_editor = ObjectProperty(None)
     rpanel = ObjectProperty(None)
@@ -830,8 +836,8 @@ class Playground(FloatLayout):
         # FIXME: add scene spdiff
         self.update_sandbox()
         if self.sokoban:
-            self.replay_slider.max = len(self.sokoban.log)
-            self.replay_slider.value = len(self.sokoban.log)
+            self.replay_steps = len(self.sokoban.log)
+            self.replay_step = len(self.sokoban.log)
 
         # self.code_editor.highlight_line(None)
         if not ok:
@@ -848,11 +854,13 @@ class Playground(FloatLayout):
                 if is_break:
                     self._status = 'BREAK'
                     hl_style = 'run'
+                    # self.code_editor.highlight_line(None, 'run')
                 else:
                     self._status = 'EXEC_ERROR'
                     hl_style = 'error'
                 # print('Br Line:', self.runner.breakpoint)
                 self.code_editor.highlight_line(None)
+                self.code_editor.highlight_line(None, 'run')
                 # self.code_editor.highlight_line(self.runner.breakpoint, 'run')
                 for filename, lineno, name, line, locals in traceback:
                     print('TRACE:', filename, lineno, name, repr(line), repr(locals)[:80]) # filename, lineno, name, line, locals)

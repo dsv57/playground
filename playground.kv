@@ -29,12 +29,33 @@
 #    Ball:
 #        id: ball
 #        center: self.parent.center
+<ActionStepSlider>:
+
+    Label:
+        text: 'Step {} of {}'.format(root.step, root.max_step)
+        # text_size: self.width, 0
+        # width: '32dp'
+        # height: '32dp'
+        size_hint: None, 1
+
+    Slider:
+        value: root.step
+        on_value: root.step = int(args[1])
+        max: root.max_step
+
 
 <VarSlider>:
 
     size_hint_y: None
     height: '32dp'
     rows: 1
+
+    Label:
+        text: root.var_name + ' = ' + root._str(root.value)
+        text_size: self.width, None
+        size_hint: None, None
+        height: '32dp'
+        width: '64dp'
 
 #    TextInput:
 #        id: var
@@ -80,111 +101,135 @@
 
 <Playground>:
     sandbox: sandbox.__self__
-    replay_slider: replay_slider
     code_editor: code_editor
     rpanel: rpanel
     textout: textout
 
     BoxLayout:
-        Splitter:
-            id: editor_pane
-            sizable_from: 'right'
-            vertical: 1
-            size_hint: (None, 1)
-            min_size: 300
-            width: 450
+        orientation: 'vertical'
 
-        #               #ScrollView: https://github.com/kivy/kivy/issues/1449
-            BoxLayout:
-                orientation: 'vertical'
+        ActionBar:
+            ActionView:
+                id: av
+                use_separator: True
+                ActionPrevious:
+                    title: 'untitled.py'
+                    with_previous: False
+                ActionOverflow:
 
-                CodeEditor:
-                    id: code_editor
-                    style: 'monokai'
-                    text: root.code
-                    on_text: root.code = args[1]
-                    auto_indent: True
-                    background_color: 0.153, 0.157, 0.133, 1
-                    cursor_width: '2sp'
-                    size_hint_y: 0.75
-                    cursor_color: (1, 1, 1, 1)
+                # ActionLabel:
+                #     text: 'untitled.py'
 
-                ToggleButton:
-                    #id: run_to_cursor
-                    on_state: root.run_to_cursor = self.state=='down'
-                    size_hint_y: None
-                    height: '48dp'
+                ActionToggleButton:
                     text: 'Run to cursor'
+                    icon: 'data/icons/run_to_cursor.png'
+                    on_state: root.run_to_cursor = self.state=='down'
+
+                ActionStepSlider:
+                    max_step: root.replay_steps
+                    step: root.replay_step
+                    on_step: root.replay_step = self.step
+
+
+        BoxLayout:
+            Splitter:
+                id: editor_pane
+                sizable_from: 'right'
+                vertical: 1
+                size_hint: (None, 1)
+                min_size: 100
+                width: 450
+
+            #               #ScrollView: https://github.com/kivy/kivy/issues/1449
+                BoxLayout:
+                    orientation: 'vertical'
+
+                    CodeEditor:
+                        id: code_editor
+                        style: 'monokai'
+                        text: root.code
+                        on_text: root.code = args[1]
+                        auto_indent: True
+                        background_color: 0.153, 0.157, 0.133, 1
+                        cursor_width: '2sp'
+                        size_hint_y: 0.75
+                        cursor_color: (1, 1, 1, 1)
+
+                    # ToggleButton:
+                    #     on_state: root.run_to_cursor = self.state=='down'
+                    #     size_hint_y: None
+                    #     height: '48dp'
+                    #     text: 'Run to cursor'
+
+                    Splitter:
+                        #id: _pane
+                        sizable_from: 'top' # if self.vertical else 'left'
+                        # vertical: 0 if root.width >= 1024 else 1
+                        # size_hint: (.3,.7)
+                        size_hint: (1, .5) if self.vertical else (.5, 1)
+                        min_size: 100
+                        # width: 200
+
+                        GridLayout:
+                            id: rpanel
+                            pos_hint: {'top': 1}
+                            cols: 1
+                            spacing: 5
+                            padding: 5
+
+                            # Slider:
+                            #     id: replay_slider
+                            #     value: root.replay_step
+                            #     on_value: root.replay_step = int(args[1])
+                            #     min: 0
+                            #     max: 0
+                            #     step: 1
+                            #     height: '32dp'
+                            #     size_hint: 1, None
+
+                            TextInput:
+                                id: watches_label
+                                font_name: '/usr/lib/python3/dist-packages/kivy/data/fonts/RobotoMono-Regular.ttf'
+                                readonly: True
+                                #text_size: self.size, None
+                                text_size: self.width, self.height
+                                # size: self.texture_size
+                                padding: mm(3), mm(3)
+                                valign: 'top'
+                                text: root.watches
+                                size_hint_y: 1
+
+
+            BoxLayout:
+                orientation: 'vertical' # 'horizontal' if root.width >= 1024 else 'vertical'
+
+                MapViewer:
+                    OurSandbox:
+                        id: sandbox
+                        min_size: 100
+                        pos: Vector(self.parent.size)*0.5+Vector(self.parent.pos)
+                        size_hint: (.6, None) if self.width < self.height else (None, .6)
 
                 Splitter:
-                    #id: _pane
+                    id: sandbox_pane
                     sizable_from: 'top' # if self.vertical else 'left'
                     # vertical: 0 if root.width >= 1024 else 1
                     # size_hint: (.3,.7)
                     size_hint: (1, .5) if self.vertical else (.5, 1)
-                    min_size: 200
+                    min_size: 100
                     # width: 200
 
-                    GridLayout:
-                        id: rpanel
-                        pos_hint: {'top': 1}
-                        cols: 1
-                        spacing: 5
-                        padding: 5
-
-                        Slider:
-                            id: replay_slider
-                            value: root.replay_step
-                            on_value: root.replay_step = int(args[1])
-                            min: 0
-                            max: 0
-                            step: 1
-                            height: '32dp'
-                            size_hint: 1, None
-
-                        TextInput:
-                            id: watches_label
-                            font_name: '/usr/lib/python3/dist-packages/kivy/data/fonts/RobotoMono-Regular.ttf'
-                            readonly: True
-                            #text_size: self.size, None
-                            text_size: self.width, self.height
-                            # size: self.texture_size
-                            padding: mm(3), mm(3)
-                            valign: 'top'
-                            text: root.watches
-                            size_hint_y: 1
-
-
-        BoxLayout:
-            orientation: 'vertical' # 'horizontal' if root.width >= 1024 else 'vertical'
-
-            MapViewer:
-                OurSandbox:
-                    id: sandbox
-                    min_size: 200
-                    pos: Vector(self.parent.size)*0.5+Vector(self.parent.pos)
-                    size_hint: (.6, None) if self.width < self.height else (None, .6)
-
-            Splitter:
-                id: sandbox_pane
-                sizable_from: 'top' # if self.vertical else 'left'
-                # vertical: 0 if root.width >= 1024 else 1
-                # size_hint: (.3,.7)
-                size_hint: (1, .5) if self.vertical else (.5, 1)
-                min_size: 200
-                # width: 200
-
-                TextInput:
-                    id: textout
-                    font_name: '/usr/lib/python3/dist-packages/kivy/data/fonts/RobotoMono-Regular.ttf'
-                    readonly: True
-                    #text_size: self.size, None
-                    text_size: self.width, self.height
-                    # size: self.texture_size
-                    padding: mm(3), mm(3)
-                    valign: 'top'
-                    text: root.console
-                    size_hint_y: 1
+                    TextInput:
+                        id: textout
+                        font_name: '/usr/lib/python3/dist-packages/kivy/data/fonts/RobotoMono-Regular.ttf'
+                        readonly: True
+                        #text_size: self.size, None
+                        text_size: self.width, self.height
+                        # size: self.texture_size
+                        padding: mm(3), mm(3)
+                        valign: 'top'
+                        text: root.console
+                        size_hint_y: 1
 
 
 
