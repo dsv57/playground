@@ -140,6 +140,8 @@ class CodeEditor(CodeInput):
         self._position_handles('both')
 
     def _draw_highlight(self, line_num, style):
+        if min(len(self._lines_rects), len(self._lines)) <= line_num:
+            return
         fill, highlight_color = self.hightlight_styles[style]
         rect = self._lines_rects[line_num]
         pos = rect.pos
@@ -216,7 +218,8 @@ class CodeEditor(CodeInput):
                 line = _text[line_start + 1:index]
                 indent = self.re_indent.match(line).group()
                 substring += indent
-        if len(_text) > 0 and _text[-1] == ':':
+        print('AI _text', repr(_text), index)
+        if len(_text) > 0 and _text[index-1] == ':':
             substring += ' ' * self.tab_width
         return substring
 
@@ -400,16 +403,13 @@ class VarSlider(GridLayout):
             return m.group()[cc:]
 
 
-#    def __init__(self, **kwargs):
-#        super(CodeEditor, self).__init__(**kwargs)
-
-
 class OurSandbox(FocusBehavior, ScatterPlane):
 
     def __init__(self, **kwargs):
         super(OurSandbox, self).__init__(**kwargs)
         self.space = pymunk.Space()
-        self.space.gravity = (0.0, -100.0)
+        self.space.gravity = (0.0, -900.0)
+        self.space.sleep_time_threshold = 0.3
         self._keyboard = None
 
         # self._keyboard = Window.request_keyboard(
@@ -610,17 +610,16 @@ class Playground(FloatLayout):
         # globs['left'] = lambda: self.sokoban_turn(-1) # setattr(self, '_sokoban_dir', {'R': 'U', 'L': 'D', 'U': 'L', 'D': 'R'}[self._sokoban_dir])
         # globs['forward'] = self.sokoban_move_player
 
-        self.sandbox.add_widget(Sprite('sokoban/images/player.png', x=0, y=250, body_type=0))
         # self.sandbox.add_widget(Sprite('images/info.png'))  # orc.gif
         # self.sandbox.add_widget(Sprite('images/bird.zip'))  # orc.gif
         # self.sandbox.add_widget(Sprite('images/cube.zip'))  # orc.gif
-        self.sandbox.add_widget(Sprite('turtle', x=-50, y=50, body_type=0))
         # img = Our'grace_hopper.jpg')
         # globs['image'] = img.image
         # globs['img'] = img
         # self.sandbox.add_widget(Sprite('circle', x=90, y=0, body_type=2))
         # self.sandbox.add_widget(Sprite('circle', x=90, y=0, rotation=45, body_type=2))
-
+        self.sandbox.add_widget(Sprite('sokoban/images/player.png', x=0, y=250, body_type=0))
+        self.sandbox.add_widget(Sprite('turtle', x=-50, y=50, body_type=0))
         self.sandbox.add_widget(Sprite('circle', x=0, y=0, body_type=0))
         self.sandbox.add_widget(Sprite('circle', x=0, y=40, body_type=0))
         self.sandbox.add_widget(Sprite('circle', x=0, y=80, body_type=0))
@@ -701,10 +700,21 @@ class Playground(FloatLayout):
                 saved = self.sandbox.children[:]
                 self.sandbox.clear_widgets()
                 self.sandbox.canvas.clear()
-                self.sandbox.space.remove(*self.sandbox.space.shapes, *self.sandbox.space.bodies)
-                # self.sandbox.space.remove(*self.sandbox.space.bodies)
+                if self.sandbox.space:
+                    self.sandbox.space.remove(*self.sandbox.space.shapes, *self.sandbox.space.bodies)
+                self.sandbox.space = pymunk.Space()
+                self.sandbox.space.gravity = (0.0, -900.0)
+                self.sandbox.space.sleep_time_threshold = 0.3
                 for widget in saved:
                     self.sandbox.add_widget(widget)
+                # self.sandbox.add_widget(Sprite('sokoban/images/player.png', x=0, y=250, body_type=0))
+                # self.sandbox.add_widget(Sprite('turtle', x=-50, y=50, body_type=0))
+                # self.sandbox.add_widget(Sprite('circle', x=0, y=0, body_type=0))
+                # self.sandbox.add_widget(Sprite('circle', x=0, y=40, body_type=0))
+                # self.sandbox.add_widget(Sprite('circle', x=0, y=80, body_type=0))
+                # self.sandbox.add_widget(Sprite('square', x=0, y=120, body_type=0))
+                # self.sandbox.add_widget(Sprite('circle', x=0, y=160, body_type=0))
+                # self.sandbox.add_widget(Sprite('circle', x=0, y=200, body_type=0))
 
                 static_body = self.sandbox.space.static_body
                 static_lines = [pymunk.Segment(static_body, (-311.0, 280.0-400), (0.0, 246.0-400), 0.0),

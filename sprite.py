@@ -510,7 +510,7 @@ class Sprite(Scatter):
         self.offset = Vec2d(0, 0)
         self._selection_line = None
         self.image = None
-        self.contour = 123
+        self.is_moved = False
         if source not in Sprite._shapes:
             self._type = 'image'
             imag = Image(
@@ -540,11 +540,11 @@ class Sprite(Scatter):
                     poly.elasticity = elasticity
                     self.pymunk_shapes.append(poly)
 
-                    Color(1., 0., 0.)
-                    self.shapes.append(
-                        Line(points=[
-                            coord for point in line for coord in point
-                        ]))
+                    # Color(1., 0., 0.)
+                    # self.shapes.append(
+                    #     Line(points=[
+                    #         coord for point in line for coord in point
+                    #     ]))
                     # print("LL", len(line), max([p.x for p in line]),
                     #       min([p.x for p in line]), max([p.y for p in line]),
                     #       min([p.y for p in line]))
@@ -586,7 +586,6 @@ class Sprite(Scatter):
                         for i in range(len(vertices) // 4):
                             vs.append((vertices[4 * i], vertices[4 * i + 1]))
                         poly = pymunk.Poly(self.body, vs)
-                        # self.parent.space.add(poly)
                         if body_type == Body.DYNAMIC:
                             poly.density = density
                         poly.friction = friction
@@ -610,10 +609,8 @@ class Sprite(Scatter):
                     cir.elasticity = elasticity
                     self.pymunk_shapes.append(cir)
             else:
-                # print('shape:', shape, shape['type'], shape['type'] == 'polygon')
                 raise Exception('unkown shape type')
 
-        print('000', self.body.center_of_gravity, self.body.local_to_world(self.body.center_of_gravity))
         self.offset = -self.bottom_left
         self.position = x, y
         self.rotation = rotation
@@ -649,8 +646,8 @@ class Sprite(Scatter):
 
     def on_position(self, instance, position):
         pass
-    #     print('On position', position)
-    #     self.position = position
+        # print('On position', position)
+        # self.position = position
         # if self._selection_line:
             # contour = [(p[0] + self.position[0], p[1] + self.position[1]) for p in self.contour]
             # self._selection_line.points = contour
@@ -665,12 +662,13 @@ class Sprite(Scatter):
         #     print('PQ:', pq)
         #     return pq
 
-    # def on_touch_up(self, touch):
+    def on_touch_up(self, touch):
         # print(touch)
-        # if touch.grab_current is not self:
-        #     return
+        if touch.grab_current is not self:
+            return
         # assert(repr(self) in touch.ud)
-        # touch.ungrab(self)
+        touch.ungrab(self)
+        self.is_moved = False
 
         # print('t. up', touch.dpos, touch.pos, touch.ppos)
         # print(touch.dpos == (0.0, 0.0), self.collide_point(touch.x, touch.y))
@@ -692,13 +690,15 @@ class Sprite(Scatter):
         # # return True
         # return super(Sprite, self).on_touch_up(touch)
 
-    # def on_touch_move(self, touch):
-    #     return repr(self) in touch.ud
+    def on_touch_move(self, touch):
+        if touch.grab_current is not self:
+            return
+
+        self.position += Vec2d(touch.dpos) / 2 #touch.pos # touch.dx, touch.dy
 
     def on_touch_down(self, touch):
-        if not self.collide_point(touch.x, touch.y):
-            return False
-        print('touch', touch, touch.dpos, (touch.ox, touch.oy), touch.pos, touch.ppos)
+        # if not self.collide_point(touch.x, touch.y):
+            # return False
         # if repr(self) in touch.ud:
         #     return False
         # touch.grab(self)
@@ -707,8 +707,13 @@ class Sprite(Scatter):
 
         # return super(Sprite, self).on_touch_down(touch)
         if self.collide_point(touch.x, touch.y):
+            print('touch', touch, touch.dpos, (touch.ox, touch.oy), touch.pos, touch.ppos)
+            touch.grab(self)
+            self.is_moved = True
+            self.body.velocity = 0, 0
+            self.body.angular_velocity = 0
             if self._selection_line:
-                self.canvas.after.remove(self._selection_line)
+                self.canvas.remove(self._selection_line)
                 self._selection_line = None
             else:
                 with self.canvas: #.after:
@@ -719,7 +724,9 @@ class Sprite(Scatter):
                     self._selection_line = Line(
                         points=contour, dash_offset=5,
                         dash_length=10, width=1.5)
-        return super(Sprite, self).on_touch_down(touch)
+            return super(Sprite, self).on_touch_down(touch)
+        else:
+            return False
         # touch.grab(self)
 
     # def on_touch_down(self, touch):
@@ -730,18 +737,16 @@ class Sprite(Scatter):
     #     return super().on_touch_down(touch)
 
     def _get_position(self):
-        print(type(self.bbox[0]))
         return Vec2d(self.bbox[0]) + self.offset
 
     def _set_position(self, position):
         if self.body:
             self.body.position = position
-            self.body.velocity = 0, 0
+            # self.body.velocity = 0, 0
+            # self.body.angular_velocity = 0
             if self.space:
                 self.space.reindex_shapes_for_body(self.body)
         return super(Sprite, self)._set_pos(Vec2d(position) - self.offset)
-            # (position[0] + self.bottom_left[0],
-             # position[1] + self.bottom_left[1]))
 
     position = AliasProperty(_get_position, _set_position, bind=('bbox', ))
 
@@ -814,8 +819,13 @@ class Sprite(Scatter):
         'x', 'y', 'transform'))
 
     def _update(self):
-        self.rotation = degrees(self.body.angle)
-        super(Sprite, self)._set_pos(self.body.position - self.offset)
+        if self.is_moved:
+            self.body.position = self.position
+            self.body.velocity = 0, 0
+            self.body.angular_velocity = 0
+        else:
+            self.rotation = degrees(self.body.angle)
+            super(Sprite, self)._set_pos(self.body.position - self.offset)
         # bl = self.bottom_left
         # center_p = self.to_parent(-bl[0], -bl[1])
         # # print(444, center_p[0] - self.x, center_p[1] - self.y)

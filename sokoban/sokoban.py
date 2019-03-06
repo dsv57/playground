@@ -123,9 +123,9 @@ class Sokoban:
 
             orig_tile = matrix[y][x]
             next_tile = matrix[y + dy][x + dx]
-            if len(matrix) < y + 2 * dy:
+            if len(matrix) <= y + 2 * dy:
                 second_tile = '#'
-            elif len(matrix[y + 2 * dy]) < x + 2 * dx:
+            elif len(matrix[y + 2 * dy]) <= x + 2 * dx:
                 second_tile = '#'
             else:
                 second_tile = matrix[y + 2 * dy][x + 2 * dx]
