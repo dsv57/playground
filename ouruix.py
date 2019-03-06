@@ -409,6 +409,7 @@ class OurSandbox(FocusBehavior, ScatterPlane):
     def __init__(self, **kwargs):
         super(OurSandbox, self).__init__(**kwargs)
         self.space = pymunk.Space()
+        self.space.gravity = (0.0, -100.0)
         self._keyboard = None
 
         # self._keyboard = Window.request_keyboard(
@@ -530,7 +531,7 @@ class Playground(FloatLayout):
 #   pass
 
 
-    code = StringProperty('''
+    code = StringProperty('''def update(dt): pass
 ''')
 
       # print(123)
@@ -609,13 +610,24 @@ class Playground(FloatLayout):
         # globs['left'] = lambda: self.sokoban_turn(-1) # setattr(self, '_sokoban_dir', {'R': 'U', 'L': 'D', 'U': 'L', 'D': 'R'}[self._sokoban_dir])
         # globs['forward'] = self.sokoban_move_player
 
-        # self.sandbox.add_widget(Sprite('images/simple_cv_joint_animated.gif'))  # orc.gif
-        # self.sandbox.add_widget(Sprite('images/bird.zip')) #orc.gif
-        # self.sandbox.add_widget(Sprite('images/cube.zip')) #orc.gif
-        # self.sandbox.add_widget(Sprite('turtle'))
+        self.sandbox.add_widget(Sprite('sokoban/images/player.png', x=0, y=250, body_type=0))
+        # self.sandbox.add_widget(Sprite('images/info.png'))  # orc.gif
+        # self.sandbox.add_widget(Sprite('images/bird.zip'))  # orc.gif
+        # self.sandbox.add_widget(Sprite('images/cube.zip'))  # orc.gif
+        self.sandbox.add_widget(Sprite('turtle', x=-50, y=50, body_type=0))
         # img = Our'grace_hopper.jpg')
         # globs['image'] = img.image
         # globs['img'] = img
+        # self.sandbox.add_widget(Sprite('circle', x=90, y=0, body_type=2))
+        # self.sandbox.add_widget(Sprite('circle', x=90, y=0, rotation=45, body_type=2))
+
+        self.sandbox.add_widget(Sprite('circle', x=0, y=0, body_type=0))
+        self.sandbox.add_widget(Sprite('circle', x=0, y=40, body_type=0))
+        self.sandbox.add_widget(Sprite('circle', x=0, y=80, body_type=0))
+        self.sandbox.add_widget(Sprite('square', x=0, y=120, body_type=0))
+        self.sandbox.add_widget(Sprite('circle', x=0, y=160, body_type=0))
+        self.sandbox.add_widget(Sprite('circle', x=0, y=200, body_type=0))
+
 
         self.runner = CodeRunner(globals=globs, special_funcs=['update'])
 
@@ -666,8 +678,8 @@ class Playground(FloatLayout):
         self.graphics_instructions = []
         # self.bind(run_code=self.compile_run)
         # self.compile_run()
-        self.trigger_exec_run = Clock.create_trigger(self.execute_run, -1)
-        self.run_schedule = None  # Clock.schedule_interval(self.trigger_exec_run, 1.0 / 60.0)
+        self.trigger_exec_update = Clock.create_trigger(self.execute_update, -1)
+        self.update_schedule = None
 
     def on_replay_step(self, *largs):
         if self.sokoban:
@@ -689,12 +701,20 @@ class Playground(FloatLayout):
                 saved = self.sandbox.children[:]
                 self.sandbox.clear_widgets()
                 self.sandbox.canvas.clear()
-                self.sandbox.space.remove(*self.sandbox.space.shapes)
-                self.sandbox.space.remove(*self.sandbox.space.bodies)
+                self.sandbox.space.remove(*self.sandbox.space.shapes, *self.sandbox.space.bodies)
+                # self.sandbox.space.remove(*self.sandbox.space.bodies)
                 for widget in saved:
                     self.sandbox.add_widget(widget)
 
-                self.sokoban.draw_level(self.sandbox)
+                static_body = self.sandbox.space.static_body
+                static_lines = [pymunk.Segment(static_body, (-311.0, 280.0-400), (0.0, 246.0-400), 0.0),
+                                pymunk.Segment(static_body, (0.0, 246.0-400), (607.0, 343.0-400), 0.0)
+                                ]
+                for line in static_lines:
+                    line.elasticity = 0.95
+                    line.friction = 0.9
+                self.sandbox.space.add(static_lines)
+                # self.sokoban.draw_level(self.sandbox)  # FIXME
 
                 with self.sandbox.canvas:
                     for t in Turtle.turtles():
@@ -841,8 +861,8 @@ class Playground(FloatLayout):
 
         # self.code_editor.highlight_line(None)
         if not ok:
-            if self.run_schedule:
-                Clock.unschedule(self.run_schedule)
+            if self.update_schedule:
+                Clock.unschedule(self.update_schedule)
             if self.runner.exception:
                 # for l in self.runner.traceback.format():
                 #     print(l[:300])
@@ -900,20 +920,19 @@ class Playground(FloatLayout):
         # print('= ' * 40)
 
         if ok and 'update' in self.runner.globals:
-            self.run_schedule = Clock.schedule_interval(self.trigger_exec_run, 1.0 / 30.0)
+            self.update_schedule = Clock.schedule_interval(self.trigger_exec_update, 1.0 / 30.0)
 
-
-    def execute_run(self, *largs):
+    def execute_update(self, dt):
         self.steps += 1
         self.runner.globals.update(self.vars)
         self.runner.globals['steps'] = self.steps
         ts_pos = self.runner.text_stream.tell()
 
         try:
-            self.runner.call_if_exists('update')
+            self.runner.call_if_exists('update', dt)
 
         except Exception as e:
-            print(e)
+            print('E4', e)
 
         else:
             self.update_sandbox(False)
@@ -923,3 +942,8 @@ class Playground(FloatLayout):
         if out:
             print(out)
             print('* ' * 20)
+
+        self.sandbox.space.step(1. / 60.)
+        self.sandbox.space.step(1. / 60.)
+
+        Sprite.update_from_pymunk()
