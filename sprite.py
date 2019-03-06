@@ -25,15 +25,18 @@ from kivy.graphics import Ellipse, Line, Color, Triangle, Quad, Rectangle, \
     Mesh, PushMatrix, PopMatrix
 from kivy.graphics.tesselator import Tesselator, WINDING_ODD, TYPE_POLYGONS
 from kivy.graphics.context_instructions import Rotate, Translate, Scale
+from kivy.graphics.transformation import Matrix
 from kivy.core.window import Window
 # from kivy.core.image import Image as CoreImage
 from kivy.properties import StringProperty, NumericProperty, \
     ListProperty, ObjectProperty, AliasProperty
+from kivy.vector import Vector
 
-import numpy as np # OurImage
+import numpy as np  # OurImage
 
 import pymunk
 import pymunk.autogeometry
+from pymunk import Body
 from pymunk.vec2d import Vec2d
 
 from named_colors import COLORS
@@ -58,21 +61,23 @@ def trace_image(img, threshold=3, simplify_tolerance=0.7, cache=True):
 
     bb = pymunk.BB(0, 0, img.width - 1, img.height - 1)
 
-    def sample_func(point):
-        try:
-            color = img.read_pixel(point.x, point.y)
-            # if point.y == 120:
-            #     print(point.x, sum(color[:3]) / 3 * 255)
-            return sum(color[:3]) / 3 * 255  # color[3]*255
-        except Exception as e:
-            print(e)  # FIXME
-            return 0
+    def sample_alpha(point):
+        color = img.read_pixel(point.x, point.y)
+        return color[3] * 255
+
+    def sample_black(point):
+        color = img.read_pixel(point.x, point.y)
+        return sum(color[:3]) / 3
 
     line_set = pymunk.autogeometry.PolylineSet()
 
     def segment_func(v0, v1):
         line_set.collect_segment(v0, v1)
 
+    if len(img.read_pixel(0, 0)) == 4:
+        sample_func = sample_alpha
+    else:
+        sample_func = sample_black
     pymunk.autogeometry.march_soft(bb, img.width, img.height, threshold,
                                    segment_func, sample_func)
 
@@ -91,10 +96,10 @@ def trace_image(img, threshold=3, simplify_tolerance=0.7, cache=True):
             min_y = min(min_y, l.y)
         w, h = max_x - min_x, max_y - min_y
 
-        center = Vec2d(min_x + w / 2., min_y + h / 2.)
+        center = (min_x + w / 2., min_y + h / 2.)
         # t = pymunk.Transform(a=1.0, d=1.0, tx=-center.x, ty=-center.y)
 
-        line = [Vec2d(l.x, img.height - l.y) for l in line]
+        line = [(l.x, img.height - l.y) for l in line]
         lines.append(line)
         # return lines
         # print('Lines:', len(lines))
@@ -308,7 +313,6 @@ class Colors:
         if not self._original_colors:
             self._original_colors = self._colors.copy()
 
-
     @property
     def lightness(self):
         return self._colors[0]
@@ -346,7 +350,8 @@ class Colors:
         'hue quadrature': ('H', 2, 2),
         'hue': ('h', 3, 2),
     }
-    _dims_ltr = {  #{_dims[d][0]: _dims[d][1:]+(d,) for d in _dims}
+
+    _dims_ltr = {  # {_dims[d][0]: _dims[d][1:]+(d,) for d in _dims}
         'J': (0, 0, 'lightness'),
         'Q': (6, 0, 'brightness'),
         'C': (1, 1, 'chroma'),
@@ -418,14 +423,14 @@ class Colors:
 
 class OurImage(Image):
 
-    #image = NumericProperty()
+    # image = NumericProperty()
 
     def __init__(self, **kwargs):
         super(OurImage, self).__init__(**kwargs)
         texture = self._coreimage.texture
         self.reference_size = texture.size
         self.texture = texture
-        image = np.fromstring(self.texture.pixels, dtype='ubyte').reshape(*texture.size, 4)[...,:3].astype('float') / 255
+        image = np.fromstring(self.texture.pixels, dtype='ubyte').reshape(*texture.size, 4)[..., :3].astype('float') / 255
         self._image = image
         width, height = texture.size
         # self.imc16 = cam16.from_xyz100(srgb.to_xyz100(srgb.from_srgb1(image.reshape((image.shape[0] * image.shape[1], 3)).T)))[[True, True,False,True,False,False,False]].T.reshape(image.shape)
@@ -464,21 +469,20 @@ class Sprite(Scatter):
             'points': [(-10, 0), (10, 0), (0, 10)]
         },
         "turtle": {
-            'type':
-            'polygon',
+            'type': 'polygon',
             'points': [(0, 16), (-2, 14), (-1, 10), (-4, 7), (-7, 9), (-9, 8),
-                       (-6, 5), (-7, 1), (-5, -3), (-8, -6), (-6, -8), (-4,
-                                                                        -5),
-                       (0, -7), (4, -5), (6, -8), (8, -6), (5, -3), (7, 1),
-                       (6, 5), (9, 8), (7, 9), (4, 7), (1, 10), (2, 14)]
+                       (-6, 5), (-7, 1), (-5, -3), (-8, -6), (-6, -8),
+                       (-4, -5), (0, -7), (4, -5), (6, -8), (8, -6), (5, -3),
+                       (7, 1), (6, 5), (9, 8), (7, 9), (4, 7), (1, 10),
+                       (2, 14)]
         },
         "circle": {
             'type': 'circle',
-            'radius': 10
+            'radius': 25
         },
         "square": {
             'type': 'polygon',
-            'points': [(10, -10), (10, 10), (-10, 10), (-10, -10)]
+            'points': [(30, -10), (30, 10), (-10, 10), (-10, -10)]
         },
         "triangle": {
             'type': 'polygon',
@@ -492,36 +496,48 @@ class Sprite(Scatter):
 
     # space = ObjectProperty(None)
 
-    def __init__(self, source, x=0, y=0, scale=1, rotation=0, trace=True, **kwargs):
+    def __init__(self, source, x=0, y=0, scale=1, rotation=0, trace=True,
+                 body_type=Body.KINEMATIC, **kwargs):
         super(Sprite, self).__init__()
 
-        self.body = pymunk.Body(body_type=pymunk.Body.KINEMATIC)
-
+        self.body = pymunk.Body(body_type=body_type)
+        density = kwargs.get('density', 0.4)
+        friction = kwargs.get('friction', 1.0)
+        elasticity = kwargs.get('elasticity', 0.1)
         self.space = None
         self.source = source
-        self.bottom_left = (0, 0)
+        self.bottom_left = Vec2d(0, 0)
+        self.offset = Vec2d(0, 0)
         self._selection_line = None
         self.image = None
-        if source not in self._shapes:
+        self.contour = 123
+        if source not in Sprite._shapes:
             self._type = 'image'
             imag = Image(
                 source=source, keep_data=trace,
-                anim_delay=kwargs.get('anim_delay', 0.05))  # , pos_hint={'center_x': 0, 'center_y': 0})
+                anim_delay=kwargs.get('anim_delay', 0.05))
             self.add_widget(imag)
             imag.size = imag.texture_size
             self.size = imag.texture_size
-            # print(222222, imag.texture_size, imag.norm_image_size)
             self.shapes = [imag]
             self.pymunk_shapes = []
-            self.bottom_left = (0, 0)
-            # TODO: self.bottom_left
 
-            lines = trace_image(imag._coreimage, cache=False) if trace else [] # [[(0, 0), (0, imag.size[1])], [(0, imag.size[1]), imag.size], [imag.size, (imag.size[0], 0)], [(imag.size[0], 0), (0, 0)]]
-            self.contour = lines
+            lines = trace_image(imag._coreimage, cache=False) if trace else []
+            print('lines:', len(lines))
+            if len(lines) > 1:
+                raise Exception('cannot add fragmented image')
+            if not lines:
+                lines = [[(0, 0), (0, imag.size[1]),
+                          imag.size, (imag.size[0], 0), (0, 0)]]
+            self.contour = lines[0] if lines else []
             with self.canvas:
                 for line in lines:
                     poly = pymunk.Poly(self.body, line)
                     # self.parent.space.add(poly)
+                    if body_type == Body.DYNAMIC:
+                        poly.density = density
+                    poly.friction = friction
+                    poly.elasticity = elasticity
                     self.pymunk_shapes.append(poly)
 
                     Color(1., 0., 0.)
@@ -536,47 +552,70 @@ class Sprite(Scatter):
                     #     shape = pymunk.Segment(self.body, line[i], line[i+1], 1)
                     #     self.parent.space.add(shape)
             # print('------------')
-        else: # Polygon shape
-            shape = self._shapes[source]
+        else:  # Polygon shape
+            shape = Sprite._shapes[source]
             self._type = shape['type']
             self.shapes = []
             self.pymunk_shapes = []
-            self.contour = shape['points']
 
-            xs, ys = tuple(zip(*shape['points']))
-            min_x = min(xs)
-            min_y = min(ys)
-            self.size = (max(xs) - min_x, max(ys) - min_y)
-            self.bottom_left = (min_x, min_y)
-            # self.pos = self.bottom_left
-            self.position = (0, 0)  # (x, y)
-            # print(11111, self.position, self.bottom_left, self.pos)
+            if shape['type'] == 'polygon':
+                self.contour = shape['points']
+                xs, ys = tuple(zip(*shape['points']))
+                min_x = min(xs)
+                min_y = min(ys)
+                self.size = max(xs) - min_x, max(ys) - min_y
+                self.bottom_left += min_x, min_y
 
-            tess = Tesselator()
-            tess.add_contour([
-                coord for point in shape['points'] for coord in point
-            ])  # (point[0]+x,point[1]+y)]) #shape['points'])
-            tess.tesselate(WINDING_ODD, TYPE_POLYGONS)
-            with self.canvas:
-                PushMatrix()
-                Translate(-min_x, -min_y)
-                Color(1, 0, 0)
-                for vertices, indices in tess.meshes:
+                tess = Tesselator()
+                tess.add_contour([
+                    coord for point in shape['points'] for coord in point
+                ])  # (point[0]+x,point[1]+y)]) #shape['points'])
+                tess.tesselate(WINDING_ODD, TYPE_POLYGONS)
+                with self.canvas:
+                    PushMatrix()
+                    Translate(-min_x, -min_y)
+                    Color(1, 0, 0)
+                    for vertices, indices in tess.meshes:
+                        self.shapes.append(
+                            Mesh(
+                                vertices=vertices,
+                                indices=indices,
+                                mode="triangle_fan"))
+
+                        vs = []
+                        for i in range(len(vertices) // 4):
+                            vs.append((vertices[4 * i], vertices[4 * i + 1]))
+                        poly = pymunk.Poly(self.body, vs)
+                        # self.parent.space.add(poly)
+                        if body_type == Body.DYNAMIC:
+                            poly.density = density
+                        poly.friction = friction
+                        poly.elasticity = elasticity
+                        self.pymunk_shapes.append(poly)
+                    PopMatrix()
+
+            elif shape['type'] == 'circle':
+                r = shape['radius']
+                self.contour = [(-r, -r), (-r, r), (r, r), (r, -r), (-r, -r)]
+                self.size = (2 * r, 2 * r)
+                self.bottom_left += -r, -r
+                with self.canvas:
+                    Color(0, 1, 0)
                     self.shapes.append(
-                        Mesh(
-                            vertices=vertices,
-                            indices=indices,
-                            mode="triangle_fan"))
+                        Ellipse(pos=(0, 0), size=(r * 2, r * 2)))
+                    cir = pymunk.Circle(self.body, r, (0, 0))
+                    if body_type == Body.DYNAMIC:
+                        cir.density = density
+                    cir.friction = friction
+                    cir.elasticity = elasticity
+                    self.pymunk_shapes.append(cir)
+            else:
+                # print('shape:', shape, shape['type'], shape['type'] == 'polygon')
+                raise Exception('unkown shape type')
 
-                    vs = []
-                    for i in range(len(vertices) // 4):
-                        vs.append((vertices[4 * i], vertices[4 * i + 1]))
-                    poly = pymunk.Poly(self.body, vs)
-                    # self.parent.space.add(poly)
-                    self.pymunk_shapes.append(poly)
-                PopMatrix()
-
-        self.position = (x, y)
+        print('000', self.body.center_of_gravity, self.body.local_to_world(self.body.center_of_gravity))
+        self.offset = -self.bottom_left
+        self.position = x, y
         self.rotation = rotation
         self._register()
 
@@ -587,30 +626,34 @@ class Sprite(Scatter):
     def on_parent(self, instance, value):
         # print('on_parent', instance, value)
         # if value: print('...', value.space, self.space, self.space and self.space.shapes, self.pymunk_shapes)
-        if value: # FIXME FIXME FIXME and value.space is not self.space:
+        if value:  # FIXME FIXME FIXME and value.space is not self.space:
             self.space = value.space
             for shape in self.pymunk_shapes:
                 # print("OP", shape)
                 # print('SHapes:', self.space.shapes)
+                if shape.body not in self.space.bodies:
+                    self.space.add(shape.body)
                 if shape not in self.space.shapes:
-                    self.space.add(shape) # FIXME: AssertionError: shape already added to space
+                    self.space.add(shape)
 
     def collide_point(self, x, y):
         # print('bbox', self.bbox)
-        if super().collide_point(x, y):
+        kivy_collide = super(Sprite, self).collide_point(x, y)
+        if kivy_collide:
             for shape in self.pymunk_shapes:
                 pq = shape.point_query((x, y))
                 if pq[0] < 0:
                     # print('Collide!')
                     return True
-        return False  # super().collide_point(x, y) #False
+        return kivy_collide  # False
 
     def on_position(self, instance, position):
-        # print('On position', position)
-        self.position = position
-        if self._selection_line:
-            contour = [(p[0] + position[0], p[1] + position[1]) for p in self.contour]
-            self._selection_line.points = contour
+        pass
+    #     print('On position', position)
+    #     self.position = position
+        # if self._selection_line:
+            # contour = [(p[0] + self.position[0], p[1] + self.position[1]) for p in self.contour]
+            # self._selection_line.points = contour
 
         # print('ON POS', self.space, self.space and self.space.shapes, self.pymunk_shapes)
         # self.body.position = position # self.to_parent(*pos)
@@ -623,7 +666,7 @@ class Sprite(Scatter):
         #     return pq
 
     # def on_touch_up(self, touch):
-        #print(touch)
+        # print(touch)
         # if touch.grab_current is not self:
         #     return
         # assert(repr(self) in touch.ud)
@@ -653,9 +696,9 @@ class Sprite(Scatter):
     #     return repr(self) in touch.ud
 
     def on_touch_down(self, touch):
-        # print('touch', touch, touch.dpos, (touch.ox, touch.oy), touch.pos, touch.ppos)
         if not self.collide_point(touch.x, touch.y):
             return False
+        print('touch', touch, touch.dpos, (touch.ox, touch.oy), touch.pos, touch.ppos)
         # if repr(self) in touch.ud:
         #     return False
         # touch.grab(self)
@@ -668,13 +711,16 @@ class Sprite(Scatter):
                 self.canvas.after.remove(self._selection_line)
                 self._selection_line = None
             else:
-                with self.canvas.after:
+                with self.canvas: #.after:
                     Color(0.2, 0.3, 1)
-                    x, y = self.position #self.bottom_left
+                    x, y = -self.bottom_left #self.position  # self.bottom_left
+                    print('source:', self.source)
                     contour = [(p[0] + x, p[1] + y) for p in self.contour]
-                    self._selection_line = Line(points=contour, dash_offset=5, dash_length=10, width=1.5)
+                    self._selection_line = Line(
+                        points=contour, dash_offset=5,
+                        dash_length=10, width=1.5)
         return super(Sprite, self).on_touch_down(touch)
-        #touch.grab(self)
+        # touch.grab(self)
 
     # def on_touch_down(self, touch):
     #     print(touch)
@@ -684,15 +730,18 @@ class Sprite(Scatter):
     #     return super().on_touch_down(touch)
 
     def _get_position(self):
-        return (self.bbox[0][0] - self.bottom_left[0],
-                self.bbox[0][1] - self.bottom_left[1])
+        print(type(self.bbox[0]))
+        return Vec2d(self.bbox[0]) + self.offset
 
     def _set_position(self, position):
-        self.body.position = position
-        if self.space:
-            self.space.reindex_shapes_for_body(self.body)
-        return super()._set_pos((position[0] + self.bottom_left[0],
-                                 position[1] + self.bottom_left[1]))
+        if self.body:
+            self.body.position = position
+            self.body.velocity = 0, 0
+            if self.space:
+                self.space.reindex_shapes_for_body(self.body)
+        return super(Sprite, self)._set_pos(Vec2d(position) - self.offset)
+            # (position[0] + self.bottom_left[0],
+             # position[1] + self.bottom_left[1]))
 
     position = AliasProperty(_get_position, _set_position, bind=('bbox', ))
 
@@ -717,16 +766,18 @@ class Sprite(Scatter):
                                   pos[1] - self.bottom_left[1])
 
     def _set_x(self, x):
-        self.body.position.x = x + self.bottom_left[0]
+        if self.body:
+            self.body.position.x = x + self.bottom_left[0]
         if self.space:
             self.space.reindex_shapes_for_body(self.body)
-        return super()._set_x(x)
+        return super(Sprite, self)._set_x(x)
 
     def _set_y(self, y):
-        self.body.position.y = y + self.bottom_left[1]
+        if self.body:
+            self.body.position.y = y + self.bottom_left[1]
         if self.space:
             self.space.reindex_shapes_for_body(self.body)
-        return super()._set_y(y)
+        return super(Sprite, self)._set_y(y)
 
     def _register(self):
         Sprite._instances.add(self)
@@ -740,10 +791,70 @@ class Sprite(Scatter):
         print('CLEAR ' * 20)
         for sprite in Sprite._instances:
             if sprite.space:
-                sprite.space.remove(*sprite.pymunk_shapes)
+                sprite.space.remove(*sprite.pymunk_shapes, sprite.body)
             # Sprite.space.remove(*sprite.pymunk_shapes)
         # TODO: Remove bodies
         Sprite._instances = set()
+
+    def _get_rotation(self):
+        v1 = Vector(0, 10)
+        tp = self.to_parent
+        v2 = Vector(*tp(*self.pos)) - tp(self.x, self.y + 10)
+        return -1.0 * (v1.angle(v2) + 180) % 360
+
+    def _set_rotation(self, rotation):
+        angle_change = self.rotation - rotation
+        r = Matrix().rotate(-radians(angle_change), 0, 0, 1)
+        self.apply_transform(r, post_multiply=True,
+                             anchor=-self.bottom_left)  # self.to_local(*self.center)
+        cx, cy = self.to_parent(*-self.bottom_left)
+        self.offset = cx - self.x, cy - self.y
+
+    rotation = AliasProperty(_get_rotation, _set_rotation, bind=(
+        'x', 'y', 'transform'))
+
+    def _update(self):
+        self.rotation = degrees(self.body.angle)
+        super(Sprite, self)._set_pos(self.body.position - self.offset)
+        # bl = self.bottom_left
+        # center_p = self.to_parent(-bl[0], -bl[1])
+        # # print(444, center_p[0] - self.x, center_p[1] - self.y)
+        # bpos = self.body.position
+        # trans = Matrix().translate(bpos[0]-center_p[0], bpos[1]-center_p[1], 0)
+        # self.apply_transform(trans)
+
+    @staticmethod
+    def update_from_pymunk():
+        for sprite in Sprite._instances:
+            if sprite.body.body_type == Body.DYNAMIC and not sprite.body.is_sleeping:
+                sprite._update()
+                # super(sprite)._set_pos(
+                #     (sprite.body.position[0] + sprite.bottom_left[0],
+                #      sprite.body.position[1] + sprite.bottom_left[1]))
+                # sprite.rotation = degrees(sprite.body.angle)
+                # print(sprite, sprite.body.position, sprite.body.velocity, sprite.space)
+
+
+        # for shape in self.sandbox.space.shapes:
+        #     if hasattr(shape, "kivy") and not shape.body.is_sleeping:
+        #         if isinstance(shape, pymunk.Circle):
+        #             body = shape.body
+        #             shape.kivy[0].pos = body.position - (shape.radius, shape.radius) + shape.offset
+        #             circle_edge = body.position + shape.offset + Vec2d(shape.radius, 0).rotated(body.angle)
+        #             shape.kivy[1].points = [body.position.x + shape.offset.x, body.position.y + shape.offset.y, circle_edge.x, circle_edge.y]
+        #         if isinstance(shape, pymunk.Segment):
+        #             body = shape.body
+        #             p1 = body.position + shape.a.cpvrotate(body.rotation_vector)
+        #             p2 = body.position + shape.b.cpvrotate(body.rotation_vector)
+        #             shape.kivy.points = p1.x, p1.y, p2.x, p2.y
+        #         if isinstance(shape, pymunk.Poly):
+        #             if isinstance(shape.kivy, Mesh):
+        #                 shape.kivy.vertices = self.vertices_from_poly(shape)
+        #             else:
+        #                 shape.kivy.points = self.points_from_poly(shape)
+        # for cons in self.space.constraints:
+        #     if hasattr(cons, "kivy"):
+        #         cons.kivy.points = self.points_from_constraint(cons)
 
 
 # #class Sandbox(RelativeLayout):
