@@ -846,8 +846,7 @@ class Playground(FloatLayout):
             self.code_editor.highlight_line(line_num)
             self.status = ('ERROR', e)
             if self.update_schedule:
-                Clock.unschedule(self.update_schedule)
-                # self.update_schedule.cancel()
+                self.update_schedule.cancel()
         except Exception as e:
             print('E:', e)
             print('* ' * 40)
@@ -856,8 +855,7 @@ class Playground(FloatLayout):
             self.code_editor.highlight_line(line_num)
             self.status = ('ERROR', e)
             if self.update_schedule:
-                Clock.unschedule(self.update_schedule)
-                # self.update_schedule.cancel()
+                self.update_schedule.cancel()
         else:
             self.code_editor.highlight_line(None)
             if COMMON_CODE in changed:
@@ -873,7 +871,7 @@ class Playground(FloatLayout):
                 print('E3:', e)
                 self.status = ('ERROR', None)
             else:
-                if 'update' in self.runner.globals and (not self.update_schedule or not self.trigger_exec_update.is_triggered):
+                if 'update' in self.runner.globals and (not self.update_schedule or not self.update_schedule.is_triggered):
                     self._last_update_time = time()
                     self.update_schedule = Clock.schedule_interval(self.trigger_exec_update, 1.0 / 30.0)
 
@@ -921,8 +919,7 @@ class Playground(FloatLayout):
         # self.code_editor.highlight_line(None)
         if not ok:
             if self.update_schedule:
-                Clock.unschedule(self.update_schedule)
-                # self.update_schedule.cancel()
+                self.update_schedule.cancel()
             if self.runner.exception:
                 # for l in self.runner.traceback.format():
                 #     print(l[:300])
@@ -999,7 +996,7 @@ class Playground(FloatLayout):
             lineno = self.runner.exception_lineno(e)
             self.code_editor.highlight_line(lineno, add=True)
             self.status = ('ERROR', e)
-            Clock.unschedule(self.update_schedule)  # .cancel()
+            self.update_schedule.cancel()
 
         else:
             self._last_update_time = now
