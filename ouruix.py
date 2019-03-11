@@ -830,6 +830,8 @@ class Playground(FloatLayout):
             print('update_sandbox:', e)
 
     def compile_code(self, *largs):
+        if self.update_schedule:
+            self.update_schedule.cancel()
         breakpoint = None
         if self.run_to_cursor:
             breakpoint = self.code_editor.cursor_row + 1
@@ -845,8 +847,6 @@ class Playground(FloatLayout):
             self.code_editor.highlight_line(None, 'run')
             self.code_editor.highlight_line(line_num)
             self.status = ('ERROR', e)
-            if self.update_schedule:
-                self.update_schedule.cancel()
         except Exception as e:
             print('E:', e)
             print('* ' * 40)
@@ -854,8 +854,6 @@ class Playground(FloatLayout):
             self.code_editor.highlight_line(None, 'run')
             self.code_editor.highlight_line(line_num)
             self.status = ('ERROR', e)
-            if self.update_schedule:
-                self.update_schedule.cancel()
         else:
             self.code_editor.highlight_line(None)
             if COMMON_CODE in changed:
@@ -991,13 +989,36 @@ class Playground(FloatLayout):
         try:
             self.runner.call_if_exists('update', dt)
 
-        except Exception as e:
-            print('E4', e)
-            lineno = self.runner.exception_lineno(e)
-            self.code_editor.highlight_line(lineno, add=True)
-            self.status = ('ERROR', e)
+        except:
             self.update_schedule.cancel()
-
+            watches = ''
+            for v, t, r in whos(self.runner.globals):
+                watches += f'{v}\t{t}\t{r}\n'            
+            exc, exc_str, traceback = self.runner.exception
+            print('EXC:', exc_str)
+            is_break = isinstance(exc, Break)
+            if is_break:
+                self.status = ('BREAK', exc)
+                hl_style = 'run'
+            else:
+                self.status = ('ERROR', exc)
+                hl_style = 'error'
+            # print('E4', e)
+            # lineno = self.runner.exception_lineno(e)
+            self.code_editor.highlight_line(None)
+            self.code_editor.highlight_line(None, 'run')
+            # self.code_editor.highlight_line(self.runner.breakpoint, 'run')
+            for filename, lineno, name, line, locals in traceback:
+                print('TRACE:', filename, lineno, name, repr(line), repr(locals)[:80]) # filename, lineno, name, line, locals)
+                if filename == '<code-input>':
+                    if name != '<module>':
+                        watched_locals = whos(locals)
+                        if watched_locals:
+                            watches += f'== {name} ==\n'
+                            for v, t, r in watched_locals:
+                                watches += f'{v}\t{t}\t{r}\n'
+                    self.code_editor.highlight_line(lineno, hl_style, add=True)
+            self.watches = watches
         else:
             self._last_update_time = now
             self.update_sandbox(False)
