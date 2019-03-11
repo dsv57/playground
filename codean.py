@@ -153,7 +153,18 @@ class AddBreak(ast.NodeTransformer):
                         break_ast(child.lineno), child)
                     new_body.append(newchild)
             node.body = new_body
-        return node  # self.generic_visit(node)  # if not self.done else node
+
+        if not self.done and hasattr(node, 'orelse'):
+            new_orelse = []
+            for i, child in enumerate(node.orelse):
+                new_orelse.append(self.visit(child))
+                if not self.done and child.lineno >= self.lineno:
+                    self.done = True
+                    newchild = ast.copy_location(
+                        break_ast(child.lineno), child)
+                    new_orelse.append(newchild)
+            node.orelse = new_orelse
+        return node
 
 
 class VarLister(ast.NodeVisitor):
@@ -281,10 +292,9 @@ class CodeRunner:
             ast.fix_missing_locations(tree)
             for i, l in enumerate(source.splitlines()):
                 print(i, l)
-            print('PATCHED:', breakpoint) #, to_source(tree))
-            for l in to_source(tree).splitlines():
-                print('=', l)
-            # print('AST LINENO', breakpoint, ast.dump(tree, include_attributes=True))
+            # print('PATCHED:', breakpoint)  #, to_source(tree))
+            # for l in to_source(tree).splitlines():
+            #     print('=', l)
 
         new_body = []
         new_ast = {}
