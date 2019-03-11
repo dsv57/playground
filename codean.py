@@ -364,8 +364,18 @@ class CodeRunner:
             with redirect_stdout(self.text_stream):
                 with redirect_stderr(self.text_stream):
                     return self._globals[func](*args, **kvargs)
-        except Break:
-            print("* Break *")
+        except Exception as e:
+            if hasattr(e, 'message'):
+                e_str = e.message
+            else:
+                e_str = str(e) or e.__class__.__name__
+            tb = self._trace(e.__traceback__)
+            self.exception = (e, e_str, tb)
+            raise e
+
+        # except Break:
+        #     print("* Break *")
+
 
     def call_if_exists(self, func, *args, **kvargs):
         if func in self._globals:
