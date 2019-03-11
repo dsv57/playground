@@ -530,7 +530,13 @@ class Playground(FloatLayout):
 #   pass
 
 
-    code = StringProperty('''def update(dt): pass
+    code = StringProperty('''b = add_sprite('square', x=0, y=-120, body_type=1)
+b.rotation = 9
+
+def update(dt):
+    if steps > 50:
+        raise Break
+    print(steps)
 ''')
 
       # print(123)
@@ -599,6 +605,12 @@ class Playground(FloatLayout):
             #         self._globals[v] = getattr(mycolors, v)
         except:
             pass
+
+        def _add_sprite(*largs, **kvargs):
+            sp = Sprite(*largs, **kvargs)
+            self.sandbox.add_widget(sp)
+            return sp
+        globs['add_sprite'] = _add_sprite
 
         self.sokoban = Sokoban()
         def sokoban_go(dx, dy):
@@ -727,36 +739,7 @@ class Playground(FloatLayout):
                 self.graphics_instructions = []
                 # self.sandbox.canvas.clear()
 
-                # Clear the Right Way (Thank you Mark Vasilkov)
-                # saved = self.sandbox.children[:]
-                self.sandbox.clear_widgets()
-                self.sandbox.canvas.clear()
-                Sprite.clear_sprites()
-                if self.sandbox.space:
-                    self.sandbox.space.remove(*self.sandbox.space.shapes, *self.sandbox.space.bodies)
-                self.sandbox.space = pymunk.Space()
-                self.sandbox.space.gravity = (0.0, -900.0)
-                self.sandbox.space.sleep_time_threshold = 0.3
-                # for widget in saved:
-                    # self.sandbox.add_widget(widget)
-                self.sandbox.add_widget(Sprite('sokoban/images/player.png', x=0, y=250, body_type=0))
-                self.sandbox.add_widget(Sprite('turtle', x=-50, y=50, body_type=0))
-                self.sandbox.add_widget(Sprite('circle', x=0, y=0, body_type=0))
-                self.sandbox.add_widget(Sprite('circle', x=0, y=40, body_type=0))
-                self.sandbox.add_widget(Sprite('circle', x=0, y=80, body_type=0))
-                self.sandbox.add_widget(Sprite('square', x=0, y=120, body_type=0))
-                self.sandbox.add_widget(Sprite('circle', x=0, y=160, body_type=0))
-                self.sandbox.add_widget(Sprite('circle', x=0, y=200, body_type=0))
-
-                static_body = self.sandbox.space.static_body
-                static_lines = [pymunk.Segment(static_body, (-311.0, 280.0-400), (0.0, 246.0-400), 0.0),
-                                pymunk.Segment(static_body, (0.0, 246.0-400), (607.0, 343.0-400), 0.0)
-                                ]
-                for line in static_lines:
-                    line.elasticity = 0.95
-                    line.friction = 0.9
-                self.sandbox.space.add(static_lines)
-                self.sokoban.draw_level(self.sandbox)  # FIXME
+                # self.sokoban.draw_level(self.sandbox)  # FIXME
 
                 with self.sandbox.canvas:
                     for t in Turtle.turtles():
@@ -868,17 +851,14 @@ class Playground(FloatLayout):
             except Exception as e:
                 print('E3:', e)
                 self.status = ('ERROR', None)
-            else:
-                if 'update' in self.runner.globals and (not self.update_schedule or not self.update_schedule.is_triggered):
-                    self._last_update_time = time()
-                    self.update_schedule = Clock.schedule_interval(self.trigger_exec_update, 1.0 / 30.0)
-
-
+            # else:
 
     def execute_code(self, *largs):
         print('execute_code')
         self.status = ('EXEC',)
         self.runner.reset(globals=self.vars)
+        prev_steps = self.steps
+        self.steps = 0
         # self.runner.set_globals(self.vars, False)
         Turtle.clear_turtles()
         # Sprite.clear_sprites()  # FIXME
@@ -890,6 +870,37 @@ class Playground(FloatLayout):
         #     if v[0] != '_':
         #         self.runner.globals[v] = getattr(turtle, v)
 
+
+        # Clear the Right Way (Thank you Mark Vasilkov)
+        # saved = self.sandbox.children[:]
+        self.sandbox.clear_widgets()
+        self.sandbox.canvas.clear()
+        Sprite.clear_sprites()
+        if self.sandbox.space:
+            self.sandbox.space.remove(*self.sandbox.space.shapes, *self.sandbox.space.bodies)
+        self.sandbox.space = pymunk.Space()
+        self.sandbox.space.gravity = (0.0, -900.0)
+        self.sandbox.space.sleep_time_threshold = 0.3
+        # for widget in saved:
+            # self.sandbox.add_widget(widget)
+        self.sandbox.add_widget(Sprite('sokoban/images/player.png', x=0, y=250, body_type=0))
+        self.sandbox.add_widget(Sprite('turtle', x=-50, y=50, body_type=0))
+        self.sandbox.add_widget(Sprite('circle', x=0, y=0, body_type=0))
+        # self.sandbox.add_widget(Sprite('circle', x=0, y=40, body_type=0))
+        # self.sandbox.add_widget(Sprite('circle', x=0, y=80, body_type=0))
+        # self.sandbox.add_widget(Sprite('square', x=0, y=120, body_type=0))
+        # self.sandbox.add_widget(Sprite('circle', x=0, y=160, body_type=0))
+        # self.sandbox.add_widget(Sprite('circle', x=0, y=200, body_type=0))
+
+        static_body = self.sandbox.space.static_body
+        static_lines = [pymunk.Segment(static_body, (-311.0, 280.0-400), (0.0, 246.0-400), 0.0),
+                        pymunk.Segment(static_body, (0.0, 246.0-400), (607.0, 343.0-400), 0.0)
+                        ]
+        for line in static_lines:
+            line.elasticity = 0.95
+            line.friction = 0.9
+        self.sandbox.space.add(static_lines)
+
         # self._run_vars = defaultdict(lambda: defaultdict(list))
         seed(123)
         ok = False
@@ -899,14 +910,21 @@ class Playground(FloatLayout):
             # self.status = ('ERROR', e)
             print('E2:', e)
 
-        out = self.runner.text_stream.getvalue()
-        self.console = out
-        print('out:', out)
-        print('- ' * 40)
         # self.code_editor.highlight_line(None)
         watches = ''
         for v, t, r in whos(self.runner.globals):
             watches += f'{v}\t{t}\t{r}\n'
+
+        if ok and 'update' in self.runner.globals:
+            # print('Replay:', prev_steps)
+            self._last_update_time = time() - prev_steps * 1/30
+            for i in range(prev_steps):
+                self.execute_update(0.0, True)
+
+        out = self.runner.text_stream.getvalue()
+        self.console = out
+        print('out:', out)
+        print('- ' * 40)
 
         # FIXME: add scene spdiff
         self.update_sandbox()
@@ -964,6 +982,9 @@ class Playground(FloatLayout):
                 self.sokoban.level += 1
                 self.sandbox.clear_widgets()
                 # self.sokoban.draw_level(self.sandbox)
+            if 'update' in self.runner.globals:  # and (not self.update_schedule or not self.update_schedule.is_triggered):
+                self._last_update_time = time()
+                self.update_schedule = Clock.schedule_interval(self.trigger_exec_update, 1.0 / 30.0)
 
         self.watches = watches
         print('= ' * 40)
@@ -978,12 +999,15 @@ class Playground(FloatLayout):
         #     self._last_update_time = time()
         #     self.update_schedule = Clock.schedule_interval(self.trigger_exec_update, 1.0 / 30.0)
 
-    def execute_update(self, *largs):
+    def execute_update(self, dt, replay=False):
         self.steps += 1
         self.runner.globals.update(self.vars)
         self.runner.globals['steps'] = self.steps
-        ts_pos = self.runner.text_stream.tell()
-        now = time()
+        if not replay:
+            ts_pos = self.runner.text_stream.tell()
+            now = time()
+        else:
+            now = self._last_update_time + self.steps * 1 / 30
         dt = now - self._last_update_time
 
         try:
@@ -993,7 +1017,7 @@ class Playground(FloatLayout):
             self.update_schedule.cancel()
             watches = ''
             for v, t, r in whos(self.runner.globals):
-                watches += f'{v}\t{t}\t{r}\n'            
+                watches += f'{v}\t{t}\t{r}\n'
             exc, exc_str, traceback = self.runner.exception
             print('EXC:', exc_str)
             is_break = isinstance(exc, Break)
@@ -1021,16 +1045,18 @@ class Playground(FloatLayout):
             self.watches = watches
         else:
             self._last_update_time = now
-            self.update_sandbox(False)
             self.sandbox.space.step(1. / 60.)
             self.sandbox.space.step(1. / 60.)
             Sprite.update_from_pymunk()
-            if self.status[0] != 'RUN':
-                self.status = ('RUN',)
+            if not replay:
+                self.update_sandbox(False)
+                if self.status[0] != 'RUN':
+                    self.status = ('RUN',)
 
-        self.runner.text_stream.seek(ts_pos)
-        out = self.runner.text_stream.read()
-        if out:
-            print(out)
-            print('* ' * 20)
-            self.console = (self.console + out)[-3000:]
+        if not replay:
+            self.runner.text_stream.seek(ts_pos)
+            out = self.runner.text_stream.read()
+            if out:
+                print(out)
+                print('* ' * 20)
+                self.console = (self.console + out)[-3000:]

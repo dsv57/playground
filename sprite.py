@@ -482,7 +482,7 @@ class Sprite(Scatter):
         },
         "square": {
             'type': 'polygon',
-            'points': [(30, -10), (30, 10), (-10, 10), (-10, -10)]
+            'points': [(50, -10), (50, 10), (-10, 10), (-10, -10)]
         },
         "triangle": {
             'type': 'polygon',
@@ -808,12 +808,20 @@ class Sprite(Scatter):
         return -1.0 * (v1.angle(v2) + 180) % 360
 
     def _set_rotation(self, rotation):
+        # TODO: Add is_symmetric optimization
         angle_change = self.rotation - rotation
-        r = Matrix().rotate(-radians(angle_change), 0, 0, 1)
-        self.apply_transform(r, post_multiply=True,
-                             anchor=-self.bottom_left)  # self.to_local(*self.center)
-        cx, cy = self.to_parent(*-self.bottom_left)
-        self.offset = cx - self.x, cy - self.y
+        if angle_change != 0:
+            r = Matrix().rotate(-radians(angle_change), 0, 0, 1)
+            self.apply_transform(r, post_multiply=True,
+                                 anchor=-self.bottom_left)  # self.to_local(*self.center)
+            cx, cy = self.to_parent(*-self.bottom_left)
+            self.offset = cx - self.x, cy - self.y
+            if self.body:
+                self.body.angle = radians(rotation)
+                if self.body.position != self.position:
+                    self.body.position = self.position
+                    if self.space:
+                        self.space.reindex_shapes_for_body(self.body)
 
     rotation = AliasProperty(_get_rotation, _set_rotation, bind=(
         'x', 'y', 'transform'))
@@ -824,8 +832,18 @@ class Sprite(Scatter):
             self.body.velocity = 0, 0
             self.body.angular_velocity = 0
         else:
-            self.rotation = degrees(self.body.angle)
-            super(Sprite, self)._set_pos(self.body.position - self.offset)
+            rotation = degrees(self.body.angle)
+            angle_change = self.rotation - rotation
+            if angle_change != 0.0:
+                r = Matrix().rotate(-radians(angle_change), 0, 0, 1)
+                self.apply_transform(r, post_multiply=True,
+                                     anchor=-self.body.center_of_gravity)  # self.to_local(*self.center)
+                cx, cy = self.to_parent(*-self.bottom_left)
+                self.offset = cx - self.x, cy - self.y
+
+            new_pos = self.body.position - self.offset
+            if Vec2d(self.pos) != new_pos:
+                super(Sprite, self)._set_pos(new_pos)
         # bl = self.bottom_left
         # center_p = self.to_parent(-bl[0], -bl[1])
         # # print(444, center_p[0] - self.x, center_p[1] - self.y)
