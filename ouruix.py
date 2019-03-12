@@ -645,7 +645,7 @@ def update(dt):
         # self.rpanel.add_widget(vs6, 1)
 
         # self.status = None
-        self.steps = 0
+        self.steps = self.prev_steps = 0
         self.trigger_exec = Clock.create_trigger(self.execute_code, -1)
         self.bind(code=self.compile_code)
         self.bind(run_to_cursor=self.compile_code)
@@ -806,11 +806,6 @@ def update(dt):
                 self.runner.reset()
 
             self.runner.compile(changed)
-        except SyntaxError as e:
-            line_num = self.runner.exception_lineno(e)
-            self.code_editor.highlight_line(None, 'run')
-            self.code_editor.highlight_line(line_num)
-            self.status = ('ERROR', e)
         except Exception as e:
             print('E:', e)
             print('* ' * 40)
@@ -826,19 +821,19 @@ def update(dt):
                 print('-='*30)
                 self.trigger_exec()
                 changed.remove(COMMON_CODE)
-            print('EXEC Changed', changed)
+            print('EXEC Changed:', changed)
             try:
-                self.runner.execute(changed)
+                if self.runner.execute(changed) and 'update' in self.runner.globals and not self.update_schedule.is_triggered:
+                    self.update_schedule()
             except Exception as e:
                 print('E3:', e)
                 self.status = ('ERROR', None)
-            # else:
 
     def execute_code(self, *largs):
         print('execute_code')
         self.status = ('EXEC',)
         self.runner.reset(globals=self.vars)
-        prev_steps = self.steps
+        self.prev_steps = max(self.steps, self.prev_steps)
         self.steps = 0
         # self.runner.set_globals(self.vars, False)
         Turtle.clear_turtles()
@@ -883,25 +878,22 @@ def update(dt):
             line.friction = 0.9
         self.sandbox.space.add(static_lines)
 
-        # self._run_vars = defaultdict(lambda: defaultdict(list))
         seed(123)
         ok = False
         try:
             ok = self.runner.execute()
         except Exception as e:
-            # self.status = ('ERROR', e)
             print('E2:', e)
 
-        # self.code_editor.highlight_line(None)
         watches = ''
         for v, t, r in whos(self.runner.globals):
             watches += f'{v}\t{t}\t{r}\n'
 
-        if ok and 'update' in self.runner.globals and prev_steps > 0:
+        if ok and 'update' in self.runner.globals and self.prev_steps > 0:
             # print('Replay:', prev_steps)
             t_start = time()
-            self._last_update_time = time() - prev_steps * 1/30
-            for i in range(prev_steps):
+            self._last_update_time = time() - self.prev_steps * 1/30
+            for i in range(self.prev_steps):
                 self.execute_update(0.0, True)
             Sprite.update_from_pymunk(False)
             print('Replay time:', (time() - t_start) * 1000, 'ms')
