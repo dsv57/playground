@@ -406,9 +406,10 @@ class OurSandbox(FocusBehavior, ScatterPlane):
 
     def __init__(self, **kwargs):
         super(OurSandbox, self).__init__(**kwargs)
-        self.space = pymunk.Space()
-        self.space.gravity = (0.0, -900.0)
-        self.space.sleep_time_threshold = 0.3
+        # self.space = pymunk.Space()
+        # self.space.gravity = (0.0, -900.0)
+        # self.space.sleep_time_threshold = 0.3
+        self.space = None
         self._keyboard = None
 
         # self._keyboard = Window.request_keyboard(
@@ -534,7 +535,7 @@ class Playground(FloatLayout):
 b.rotation = 9
 
 def update(dt):
-    if steps > 50:
+    if steps > 500:
         raise Break
     print(steps)
 ''')
@@ -621,26 +622,6 @@ def update(dt):
         globs['left'] = sokoban_go(-1, 0)
         globs['up'] = sokoban_go(0, 1)
         globs['down'] = sokoban_go(0, -1)
-        # globs['right'] = lambda: self.sokoban_turn(1) # setattr(self, '_sokoban_dir', {'R': 'D', 'L': 'U', 'U': 'R', 'D': 'L'}[self._sokoban_dir])
-        # globs['left'] = lambda: self.sokoban_turn(-1) # setattr(self, '_sokoban_dir', {'R': 'U', 'L': 'D', 'U': 'L', 'D': 'R'}[self._sokoban_dir])
-        # globs['forward'] = self.sokoban_move_player
-
-        # self.sandbox.add_widget(Sprite('images/info.png'))  # orc.gif
-        # self.sandbox.add_widget(Sprite('images/bird.zip'))  # orc.gif
-        # self.sandbox.add_widget(Sprite('images/cube.zip'))  # orc.gif
-        # img = Our'grace_hopper.jpg')
-        # globs['image'] = img.image
-        # globs['img'] = img
-        # self.sandbox.add_widget(Sprite('circle', x=90, y=0, body_type=2))
-        # self.sandbox.add_widget(Sprite('circle', x=90, y=0, rotation=45, body_type=2))
-        # self.sandbox.add_widget(Sprite('sokoban/images/player.png', x=0, y=250, body_type=0))
-        # self.sandbox.add_widget(Sprite('turtle', x=-50, y=50, body_type=0))
-        # self.sandbox.add_widget(Sprite('circle', x=0, y=0, body_type=0))
-        # self.sandbox.add_widget(Sprite('circle', x=0, y=40, body_type=0))
-        # self.sandbox.add_widget(Sprite('circle', x=0, y=80, body_type=0))
-        # self.sandbox.add_widget(Sprite('square', x=0, y=120, body_type=0))
-        # self.sandbox.add_widget(Sprite('circle', x=0, y=160, body_type=0))
-        # self.sandbox.add_widget(Sprite('circle', x=0, y=200, body_type=0))
 
         self.trigger_exec_update = Clock.create_trigger(self.execute_update, -1)
         self.update_schedule = None
@@ -881,16 +862,17 @@ def update(dt):
         self.sandbox.space = pymunk.Space()
         self.sandbox.space.gravity = (0.0, -900.0)
         self.sandbox.space.sleep_time_threshold = 0.3
+        self.sandbox.space.replay_mode = False
         # for widget in saved:
             # self.sandbox.add_widget(widget)
         self.sandbox.add_widget(Sprite('sokoban/images/player.png', x=0, y=250, body_type=0))
         self.sandbox.add_widget(Sprite('turtle', x=-50, y=50, body_type=0))
         self.sandbox.add_widget(Sprite('circle', x=0, y=0, body_type=0))
-        # self.sandbox.add_widget(Sprite('circle', x=0, y=40, body_type=0))
-        # self.sandbox.add_widget(Sprite('circle', x=0, y=80, body_type=0))
-        # self.sandbox.add_widget(Sprite('square', x=0, y=120, body_type=0))
-        # self.sandbox.add_widget(Sprite('circle', x=0, y=160, body_type=0))
-        # self.sandbox.add_widget(Sprite('circle', x=0, y=200, body_type=0))
+        self.sandbox.add_widget(Sprite('circle', x=0, y=40, body_type=0))
+        self.sandbox.add_widget(Sprite('circle', x=0, y=80, body_type=0))
+        self.sandbox.add_widget(Sprite('square', x=0, y=120, body_type=0))
+        self.sandbox.add_widget(Sprite('circle', x=0, y=160, body_type=0))
+        self.sandbox.add_widget(Sprite('circle', x=0, y=200, body_type=0))
 
         static_body = self.sandbox.space.static_body
         static_lines = [pymunk.Segment(static_body, (-311.0, 280.0-400), (0.0, 246.0-400), 0.0),
@@ -915,11 +897,15 @@ def update(dt):
         for v, t, r in whos(self.runner.globals):
             watches += f'{v}\t{t}\t{r}\n'
 
-        if ok and 'update' in self.runner.globals:
+        if ok and 'update' in self.runner.globals and prev_steps > 0:
             # print('Replay:', prev_steps)
+            t_start = time()
             self._last_update_time = time() - prev_steps * 1/30
             for i in range(prev_steps):
                 self.execute_update(0.0, True)
+            Sprite.update_from_pymunk(False)
+            print('Replay time:', (time() - t_start) * 1000, 'ms')
+
 
         out = self.runner.text_stream.getvalue()
         self.console = out
@@ -1000,6 +986,7 @@ def update(dt):
         #     self.update_schedule = Clock.schedule_interval(self.trigger_exec_update, 1.0 / 30.0)
 
     def execute_update(self, dt, replay=False):
+        self.sandbox.space.replay_mode = replay
         self.steps += 1
         self.runner.globals.update(self.vars)
         self.runner.globals['steps'] = self.steps
@@ -1047,8 +1034,8 @@ def update(dt):
             self._last_update_time = now
             self.sandbox.space.step(1. / 60.)
             self.sandbox.space.step(1. / 60.)
-            Sprite.update_from_pymunk()
             if not replay:
+                Sprite.update_from_pymunk()
                 self.update_sandbox(False)
                 if self.status[0] != 'RUN':
                     self.status = ('RUN',)

@@ -507,7 +507,6 @@ class Sprite(Scatter):
         self.space = None
         self.source = source
         self.bottom_left = Vec2d(0, 0)
-        self.offset = Vec2d(0, 0)
         self._selection_line = None
         self.image = None
         self.is_moved = False
@@ -563,7 +562,7 @@ class Sprite(Scatter):
                 xs, ys = tuple(zip(*shape['points']))
                 min_x = min(xs)
                 min_y = min(ys)
-                self.size = max(xs) - min_x, max(ys) - min_y
+                self.size = (max(xs) - min_x, max(ys) - min_y)
                 self.bottom_left += min_x, min_y
 
                 tess = Tesselator()
@@ -611,7 +610,6 @@ class Sprite(Scatter):
             else:
                 raise Exception('unkown shape type')
 
-        self.offset = -self.bottom_left
         self.position = x, y
         self.rotation = rotation
         self._register()
@@ -694,7 +692,7 @@ class Sprite(Scatter):
         if touch.grab_current is not self:
             return
 
-        self.position += Vec2d(touch.dpos) / 2 #touch.pos # touch.dx, touch.dy
+        self.position += Vec2d(touch.dpos) / 2  # touch.pos # touch.dx, touch.dy
 
     def on_touch_down(self, touch):
         # if not self.collide_point(touch.x, touch.y):
@@ -737,7 +735,10 @@ class Sprite(Scatter):
     #     return super().on_touch_down(touch)
 
     def _get_position(self):
-        return Vec2d(self.bbox[0]) + self.offset
+        if self.body:
+            return self.body.position
+        else:
+            return Vec2d(self.bbox[0]) + self.offset
 
     def _set_position(self, position):
         if self.body:
@@ -746,43 +747,104 @@ class Sprite(Scatter):
             # self.body.angular_velocity = 0
             if self.space:
                 self.space.reindex_shapes_for_body(self.body)
-        return super(Sprite, self)._set_pos(Vec2d(position) - self.offset)
-
+                if self.space.replay_mode:
+                    return
+        pos = Vec2d(position)
+        _pos = self.to_parent(*-self.bottom_left)
+        if pos == _pos:
+            return
+        t = pos - _pos
+        trans = Matrix().translate(t.x, t.y, 0)
+        self.apply_transform(trans)
     position = AliasProperty(_get_position, _set_position, bind=('bbox', ))
 
     def _get_xcor(self):
-        return self.bbox[0][0] - self.bottom_left[0]
+        if self.body:
+            return self.body.position.x
+        return self.bbox[0][0] + self.offset.x
 
     def _set_xcor(self, x):
-        return self._set_x(x + self.bottom_left[0])
-
+        self._set_x(x - self.offset.x)
     xcor = AliasProperty(_get_xcor, _set_xcor, bind=('bbox', ))
 
     def _get_ycor(self):
-        return self.bbox[0][1] - self.bottom_left[1]
+        if self.body:
+            return self.body.position.y
+        return self.bbox[0][1] + self.offset.y
 
     def _set_ycor(self, y):
-        return self._set_y(y + self.bottom_left[1])
-
+        self._set_y(y - self.offset.y)
     ycor = AliasProperty(_get_ycor, _set_ycor, bind=('bbox', ))
 
+    def _get_bbox(self):
+        # FIXME: self.size?
+        if self.body:
+            xmin, ymin = xmax, ymax = self.body.local_to_world(self.bottom_left)
+            for point in [(self.width, 0), (0, self.height), self.size]:
+                x, y = self.body.local_to_world(Vec2d(point) + self.bottom_left)
+                if x < xmin:
+                    xmin = x
+                if y < ymin:
+                    ymin = y
+                if x > xmax:
+                    xmax = x
+                if y > ymax:
+                    ymax = y
+            return Vec2d(xmin, ymin), Vec2d(xmax - xmin, ymax - ymin)
+        return super(Sprite, self).bbox
+    bbox = AliasProperty(_get_bbox, None, bind=(
+        'transform', 'width', 'height'))
+
+    def _get_center(self):
+        return super(Sprite, self)._get_center
+
+    def _set_center(self, center):
+        if center == self.center:
+            return False
+        t = Vec2d(*center) - self.center
+        trans = Matrix().translate(t.x, t.y, 0)
+        self.apply_transform(trans)
+        if body:
+            self.body.position += t
+    center = AliasProperty(_get_center, _set_center, bind=('bbox', ))
+
     def _set_pos(self, pos):
-        return self._set_position(pos[0] - self.bottom_left[0],
-                                  pos[1] - self.bottom_left[1])
+        self._set_position(Vec2d(pos) + self.offset)
+
+    def _get_pos(self):
+        if self.body:
+            return self.body.position - self.offset
+    pos = AliasProperty(_get_pos, _set_pos, bind=('bbox', ))
+
+    def _get_x(self):
+        if self.body:
+            return self.body.position.x - self.offset.x
+        return self.bbox[0][0]
 
     def _set_x(self, x):
         if self.body:
-            self.body.position.x = x + self.bottom_left[0]
-        if self.space:
-            self.space.reindex_shapes_for_body(self.body)
-        return super(Sprite, self)._set_x(x)
+            self.body.position.x = x + self.offset.x
+            if self.space:
+                self.space.reindex_shapes_for_body(self.body)
+                if self.space.replay_mode:
+                    return
+        super(Sprite, self)._set_x(x)
+    x = AliasProperty(_get_x, _set_x, bind=('bbox', ))
+
+    def _get_y(self):
+        if self.body:
+            return self.body.position.y - self.offset.y
+        return self.bbox[0][1]
 
     def _set_y(self, y):
         if self.body:
-            self.body.position.y = y + self.bottom_left[1]
-        if self.space:
-            self.space.reindex_shapes_for_body(self.body)
-        return super(Sprite, self)._set_y(y)
+            self.body.position.y = y + self.offset.y
+            if self.space:
+                self.space.reindex_shapes_for_body(self.body)
+                if self.space.replay_mode:
+                    return
+        super(Sprite, self)._set_y(y)
+    y = AliasProperty(_get_y, _set_y, bind=('bbox', ))
 
     def _register(self):
         Sprite._instances.add(self)
@@ -797,31 +859,33 @@ class Sprite(Scatter):
         for sprite in Sprite._instances:
             if sprite.space:
                 sprite.space.remove(*sprite.pymunk_shapes, sprite.body)
-            # Sprite.space.remove(*sprite.pymunk_shapes)
-        # TODO: Remove bodies
         Sprite._instances = set()
 
+    @property
+    def offset(self):
+        if self.body:
+            return self.body.position - self.bbox[0]
+        cx, cy = self.to_parent(*-self.bottom_left)
+        return Vec2d(cx - self.x, cy - self.y)
+
     def _get_rotation(self):
-        v1 = Vector(0, 10)
-        tp = self.to_parent
-        v2 = Vector(*tp(*self.pos)) - tp(self.x, self.y + 10)
-        return -1.0 * (v1.angle(v2) + 180) % 360
+        if self.body:
+            return degrees(self.body.angle)
+        return (360 - (Vec2d(self.to_parent(0, 10)) - self.to_parent(0, 0)).get_angle_degrees_between((0, 10))) % 360
 
     def _set_rotation(self, rotation):
         # TODO: Add is_symmetric optimization
-        angle_change = self.rotation - rotation
-        if angle_change != 0:
-            r = Matrix().rotate(-radians(angle_change), 0, 0, 1)
-            self.apply_transform(r, post_multiply=True,
-                                 anchor=-self.bottom_left)  # self.to_local(*self.center)
-            cx, cy = self.to_parent(*-self.bottom_left)
-            self.offset = cx - self.x, cy - self.y
-            if self.body:
-                self.body.angle = radians(rotation)
-                if self.body.position != self.position:
-                    self.body.position = self.position
-                    if self.space:
-                        self.space.reindex_shapes_for_body(self.body)
+        if not self.space or not self.space.replay_mode:
+            angle_change = self.rotation - rotation
+            if angle_change != 0:
+                r = Matrix().rotate(-radians(angle_change), 0, 0, 1)
+                self.apply_transform(r, post_multiply=True,
+                                     anchor=-self.bottom_left)
+        if self.body:
+            self.body.angle = radians(rotation)
+            self.body.position = self.position
+            if self.space:
+                self.space.reindex_shapes_for_body(self.body)
 
     rotation = AliasProperty(_get_rotation, _set_rotation, bind=(
         'x', 'y', 'transform'))
@@ -832,35 +896,31 @@ class Sprite(Scatter):
             self.body.velocity = 0, 0
             self.body.angular_velocity = 0
         else:
+            _rotation = (360 - (Vec2d(self.to_parent(0, 10)) - self.to_parent(0, 0)).get_angle_degrees_between((0, 10))) % 360
             rotation = degrees(self.body.angle)
-            angle_change = self.rotation - rotation
+            angle_change = _rotation - rotation
             if angle_change != 0.0:
                 r = Matrix().rotate(-radians(angle_change), 0, 0, 1)
                 self.apply_transform(r, post_multiply=True,
-                                     anchor=-self.body.center_of_gravity)  # self.to_local(*self.center)
-                cx, cy = self.to_parent(*-self.bottom_left)
-                self.offset = cx - self.x, cy - self.y
-
-            new_pos = self.body.position - self.offset
-            if Vec2d(self.pos) != new_pos:
-                super(Sprite, self)._set_pos(new_pos)
-        # bl = self.bottom_left
-        # center_p = self.to_parent(-bl[0], -bl[1])
-        # # print(444, center_p[0] - self.x, center_p[1] - self.y)
-        # bpos = self.body.position
-        # trans = Matrix().translate(bpos[0]-center_p[0], bpos[1]-center_p[1], 0)
-        # self.apply_transform(trans)
+                                     anchor=-self.body.center_of_gravity)
+            pos = Vec2d(self.body.position)
+            _pos = self.to_parent(*-self.bottom_left)
+            if pos == _pos:
+                return
+            t = pos - _pos
+            trans = Matrix().translate(t.x, t.y, 0)
+            self.apply_transform(trans)
 
     @staticmethod
-    def update_from_pymunk():
+    def update_from_pymunk(ignore_sleeping=True):
         for sprite in Sprite._instances:
-            if sprite.body.body_type == Body.DYNAMIC and not sprite.body.is_sleeping:
+            if sprite.body.body_type != Body.STATIC and (not ignore_sleeping or not sprite.body.is_sleeping):
                 sprite._update()
-                # super(sprite)._set_pos(
-                #     (sprite.body.position[0] + sprite.bottom_left[0],
-                #      sprite.body.position[1] + sprite.bottom_left[1]))
-                # sprite.rotation = degrees(sprite.body.angle)
-                # print(sprite, sprite.body.position, sprite.body.velocity, sprite.space)
+
+
+
+
+
 
 
         # for shape in self.sandbox.space.shapes:
