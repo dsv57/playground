@@ -183,9 +183,9 @@ class VarLister(ast.NodeVisitor):
 class CodeRunner:
 
     def __init__(self, source=None, name='<code-input>', globals={},
-                 special_funcs=[]):
+                 special_funcs=None):
         self._name = name
-        self._special_funcs = special_funcs
+        self._special_funcs = special_funcs or []
         self._ast = {}
         self._codeobjs = {}
         self._common_vars = set()

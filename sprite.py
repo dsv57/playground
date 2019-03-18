@@ -2,9 +2,12 @@
 
 from math import *
 from random import *
+from weakref import WeakSet
 from os import stat
 from filecmp import _sig as file_sig
 from collections import OrderedDict
+from collections.abc import Iterable, Mapping
+from numbers import Number
 import pickle
 # import hashlib
 
@@ -30,7 +33,6 @@ from kivy.core.window import Window
 # from kivy.core.image import Image as CoreImage
 from kivy.properties import StringProperty, NumericProperty, \
     ListProperty, ObjectProperty, AliasProperty
-from kivy.vector import Vector
 
 import numpy as np  # OurImage
 
@@ -38,10 +40,79 @@ import pymunk
 import pymunk.autogeometry
 from pymunk import Body
 from pymunk.vec2d import Vec2d
-
 from named_colors import COLORS
 
-# from kivy.uix.image import Image
+
+class Vector(Vec2d):
+    __slots__ = ("x", "y")
+
+    def __init__(self, x_or_pair=None, y=None):
+        if x_or_pair != None:
+            if y == None:
+                if hasattr(x_or_pair, "x") and hasattr(x_or_pair, "y"):
+                    self.x = float(x_or_pair.x)
+                    self.y = float(x_or_pair.y)
+                # elif isinstance(x_or_pair, Mapping) and 'angle' in x_or_pair and 'radius' in x_or_pair:
+                #     r = float(x_or_pair['radius'])
+                #     a = float(x_or_pair['angle'])
+                #     self.x = r * cos(a)
+                #     self.y = r * sin(a)
+                else:
+                    self.x = float(x_or_pair[0])
+                    self.y = float(x_or_pair[1])
+            else:
+                self.x = float(x_or_pair)
+                self.y = float(y)
+        else:
+            self.x = 0
+            self.y = 0
+
+    @classmethod
+    def polar(cls, angle, radius=1):
+        r = float(radius)
+        a = float(angle)
+        return cls(r * cos(a), r * sin(a))
+
+    @classmethod
+    def polar_degrees(cls, angle, radius=1):
+        return cls.polar(radians(angle), radius)
+
+    def __repr__(self):
+        return 'Vector(%s, %s)' % (self.x, self.y)
+
+    def __str__(self):
+        return str(tuple(self))
+
+    def __eq__(self, other):
+        return tuple(self) == tuple(other)
+
+    def get_length_sqrd(self):
+        return self.x * self.x + self.y * self.y
+ 
+    def get_length(self):
+        return hypot(self.x, self.y)
+
+    def get_distance(self, other):
+        return hypot(self.x - other[0], self.y - other[1])
+
+    def get_dist_sqrd(self, other):
+        dx = self.x - other[0]
+        dy = self.y - other[1]
+        return dx * dx + dy * dy
+
+    def __format__(self, fmt_spec=''):
+        if fmt_spec.endswith('p'):
+            fmt_spec = fmt_spec[:-1]
+            coords = (abs(self), self.angle())
+            outer_fmt = '<{}, {}>'
+        else:
+            coords = self
+            outer_fmt = '({}, {})'
+            components = (format(c, fmt_spec) for c in coords)
+        return outer_fmt.format(*components)
+
+    def __hash__(self):
+        return hash(self.x) ^ hash(self.y)
 
 
 def trace_image(img, threshold=3, simplify_tolerance=0.7, cache=True):
@@ -127,7 +198,7 @@ def trace_image(img, threshold=3, simplify_tolerance=0.7, cache=True):
 def ellipse_from_circle(shape):
     pos = shape.body.position - (shape.radius, shape.radius) + shape.offset
     e = Ellipse(pos=pos, size=[shape.radius * 2, shape.radius * 2])
-    circle_edge = shape.body.position + shape.offset + Vec2d(
+    circle_edge = shape.body.position + shape.offset + Vector(
         shape.radius, 0).rotated(shape.body.angle)
     Color(*COLORS['dark slate gray'])  # (.17,.24,.31)
     line = Line(points=[
@@ -458,10 +529,166 @@ class OurImage(Image):
         image_sr = srgb.to_srgb1(srgb.from_xyz100(cam16.to_xyz100(im.reshape((self.image.shape[0] * self.image.shape[1], 3)).T, descr))).T # JCh
         self.set_image(image_sr.clip(0, 1))
 
+# Vector libs:
+#   https://github.com/exyte/Macaw/wiki/Getting-started + https://blog.exyte.com/replicating-apple-design-awarded-applications-70e5df4c4b94
+#   http://dmitrybaranovskiy.github.io/raphael/
+#   http://paperjs.org/tutorials/geometry/point-size-and-rectangle/ + http://paperjs.org/reference/path/
+
+# class Locus {
+#     open func bounds() -> Rect {
+#         return Rect()
+#     }
+#     open func stroke(with: Stroke) -> Shape {
+#         return Shape(form: self, stroke: with)
+#     }
+#     open func fill(with: Fill) -> Shape {
+#         return Shape(form: self, fill: with)
+#     }
+#     open func stroke(fill: Fill = Color.black, width: Double = 1, cap: LineCap = .butt, join: LineJoin = .miter, dashes: [Double] = []) -> Shape {
+#         return Shape(form: self, stroke: Stroke(fill: fill, width: width, cap: cap, join: join, dashes: dashes))
+#     }
+# }
+
+
+    # def __init__(self, *args, **kwargs):
+    #     corner = None
+    #     size = None
+    #     if args and isinstance(args[0], Iterable):
+    #         corner = args[0]
+    #     if len(args) > 1 and isinstance(args[1], Iterable):
+    #         size = args[1]
+    #     if len(args) in [3, 4] and all([isinstance(a, Number) for a in args]):
+    #         corner = args[:2]
+    #         size = args[2:]
+    #         if len(size) == 1:
+    #             size *= 2
+    #     if size is None:
+    #         size = kwargs.pop('size', None)
+    #         if isinstance(size, Number):
+    #             size = size, size
+    #         if size is None and ('width' in kwargs or 'height' in kwargs):
+    #             size = kwargs.pop('width', 50), kwargs.pop('height', 50)
+    #     if corner is None:
+    #         corner = kwargs.pop('corner', None)
+    #         if corner is None:
+    #             if 'x' in kwargs or 'y' in kwargs:
+    #                 corner = kwargs.pop('x', 0), kwargs.pop('y', 0)
+    #             elif size and 'center' in kwargs:
+    #                 corner = Vector(kwargs.pop('center')) - Vector(size) / 2
+    #             # elif size and ('center_x' in kwargs or 'center_y' in kwargs):
+    #             #     corner = Vector(kwargs.get('center_x', 0), kwargs.get('center_y', 0)) - size / 2
+    #     if corner and size is None and 'to' in kwargs:
+    #         size = Vector(kwargs.pop('to')) - corner
+
+    #     if kwargs:
+    #         raise Exception(f'Bad arguments: {", ".join(kwargs)}')
+
+    #     self.corner = Vector(corner or (0, 0))
+    #     self.size = Vector(size or (50, 50))
+
+
+
+class Rectangle(object):
+
+    def __init__(self, corner=(0, 0), size=(50, 50)):
+        super(Rectangle, self).__init__()
+        self.corner = Vector(corner or (0, 0))
+        if isinstance(size, Number):
+            size = size, size
+        self.size = Vector(size or (50, 50))
+
+    @classmethod
+    def from_center(cls, center=(0, 0), size=(50, 50)):
+        if isinstance(size, Number):
+            size = size, size
+        return cls(Vector(center) - Vector(size) / 2, size)
+
+    @classmethod
+    def from_corners(cls, from_corner=(0,0), to_corner=(50, 50)):
+        return cls(from_corner, Vector(to_corner) - from_corner)
+
+    def __repr__(self):
+        return f'Rectangle(({self.corner.x}, {self.corner.y}), ({self.size.x}, {self.size.y}))'
+
+    @property
+    def x(self):
+        return self.corner.x
+    
+    @x.setter
+    def x(self, x):
+        self.corner.x = x
+
+    @property
+    def y(self):
+        return self.corner.y
+    
+    @y.setter
+    def y(self, y):
+        self.corner.y = y
+
+    # @property
+    # def corner(self):
+    #     return self._corner
+    
+    # @corner.setter
+    # def corner(self, corner):
+    #     self._corner = corner
+
+    # @property
+    # def size(self):
+    #     return self._size
+    
+    # @size.setter
+    # def size(self, size):
+    #     self._size = size
+
+    @property
+    def width(self):
+        return self.size.x
+    
+    @width.setter
+    def width(self, width):
+        self.size.x = width
+
+    @property
+    def height(self):
+        return self.size.y
+    
+    @height.setter
+    def height(self, height):
+        self.size.y = height
+
+    @property
+    def center(self):
+        return self.corner + self.size / 2
+    
+    @center.setter
+    def center(self, center):
+        self.corner = center - self.size / 2
+
+    @property
+    def center_x(self):
+        return self.corner.x + self.size.x / 2
+    
+    @center_x.setter
+    def center_x(self, x):
+        self.corner.x = x - self.size.x / 2
+
+    @property
+    def center_y(self):
+        return self.corner.y + self.size.y / 2
+    
+    @center_y.setter
+    def center_y(self, y):
+        self.corner.y = y - self.size.y / 2
+
+    def __eq__(self, other):
+        return self.corner == other.corner and self.size == other.size
+
 
 class Sprite(Scatter):
 
-    _instances = set()
+    _instances = WeakSet()
 
     _shapes = {
         "arrow": {
@@ -482,7 +709,11 @@ class Sprite(Scatter):
         },
         "square": {
             'type': 'polygon',
-            'points': [(50, -10), (50, 10), (-10, 10), (-10, -10)]
+            'points': [(10, -10), (10, 10), (-10, 10), (-10, -10)]
+        },
+        "platform": {
+            'type': 'polygon',
+            'points': [(-10, -50), (10, -50), (10, 50), (-10, 50)]
         },
         "triangle": {
             'type': 'polygon',
@@ -496,17 +727,17 @@ class Sprite(Scatter):
 
     # space = ObjectProperty(None)
 
-    def __init__(self, source, x=0, y=0, scale=1, rotation=0, trace=True,
+    def __init__(self, source, x=0, y=0, scale=1, rotation=0, color='old lace', trace=True,
                  body_type=Body.KINEMATIC, **kwargs):
         super(Sprite, self).__init__()
 
         self.body = pymunk.Body(body_type=body_type)
         density = kwargs.get('density', 0.4)
         friction = kwargs.get('friction', 1.0)
-        elasticity = kwargs.get('elasticity', 0.1)
+        elasticity = kwargs.get('elasticity', 1.0)
         self.space = None
         self.source = source
-        self.bottom_left = Vec2d(0, 0)
+        self.bottom_left = Vector(0, 0)
         self._selection_line = None
         self.image = None
         self.is_moved = False
@@ -559,11 +790,13 @@ class Sprite(Scatter):
 
             if shape['type'] == 'polygon':
                 self.contour = shape['points']
+                self.contour.append(self.contour[0])
+                # print('contour', self.contour)
                 xs, ys = tuple(zip(*shape['points']))
                 min_x = min(xs)
                 min_y = min(ys)
                 self.size = (max(xs) - min_x, max(ys) - min_y)
-                self.bottom_left += min_x, min_y
+                self.bottom_left = Vector(min_x, min_y)
 
                 tess = Tesselator()
                 tess.add_contour([
@@ -573,17 +806,16 @@ class Sprite(Scatter):
                 with self.canvas:
                     PushMatrix()
                     Translate(-min_x, -min_y)
-                    Color(1, 0, 0)
+                    Color(*(COLORS.get(color) or (1, 0, 0)))
                     for vertices, indices in tess.meshes:
+                        # offset_vs = [v - (min_x, min_y)[i % 2] for i, v in enumerate(vertices)]
                         self.shapes.append(
                             Mesh(
                                 vertices=vertices,
                                 indices=indices,
                                 mode="triangle_fan"))
 
-                        vs = []
-                        for i in range(len(vertices) // 4):
-                            vs.append((vertices[4 * i], vertices[4 * i + 1]))
+                        vs = list(zip(vertices[::4], vertices[1::4]))
                         poly = pymunk.Poly(self.body, vs)
                         if body_type == Body.DYNAMIC:
                             poly.density = density
@@ -596,9 +828,9 @@ class Sprite(Scatter):
                 r = shape['radius']
                 self.contour = [(-r, -r), (-r, r), (r, r), (r, -r), (-r, -r)]
                 self.size = (2 * r, 2 * r)
-                self.bottom_left += -r, -r
+                self.bottom_left = Vector(-r, -r)
                 with self.canvas:
-                    Color(0, 1, 0)
+                    Color(*(COLORS.get(color) or (1, 0, 0)))
                     self.shapes.append(
                         Ellipse(pos=(0, 0), size=(r * 2, r * 2)))
                     cir = pymunk.Circle(self.body, r, (0, 0))
@@ -613,6 +845,29 @@ class Sprite(Scatter):
         self.position = x, y
         self.rotation = rotation
         self._register()
+
+    def apply_force(self, force, point=(0, 0)):
+        self.body.apply_force_at_local_point(force, point)
+
+    def apply_impulse(self, force, point=(0, 0)):
+        self.body.apply_impulse_at_local_point(force, point)
+
+
+    @property
+    def velocity(self):
+        return self.body.velocity
+
+    @velocity.setter
+    def velocity(self, velocity):
+        self.body.velocity = velocity
+
+    @property
+    def angular_velocity(self):
+        return self.body.angular_velocity
+
+    @angular_velocity.setter
+    def angular_velocity(self, angular_velocity):
+        self.body.angular_velocity = angular_velocity
 
     # def draw(self):
     #     with self.canvas:
@@ -692,7 +947,7 @@ class Sprite(Scatter):
         if touch.grab_current is not self:
             return
 
-        self.position += Vec2d(touch.dpos) / 2  # touch.pos # touch.dx, touch.dy
+        self.position += Vector(touch.dpos) / 2  # touch.pos # touch.dx, touch.dy
 
     def on_touch_down(self, touch):
         # if not self.collide_point(touch.x, touch.y):
@@ -738,7 +993,7 @@ class Sprite(Scatter):
         if self.body:
             return self.body.position
         else:
-            return Vec2d(self.bbox[0]) + self.offset
+            return Vector(self.bbox[0]) + self.offset
 
     def _set_position(self, position):
         if self.body:
@@ -749,7 +1004,7 @@ class Sprite(Scatter):
                 self.space.reindex_shapes_for_body(self.body)
                 if self.space.replay_mode:
                     return
-        pos = Vec2d(position)
+        pos = Vector(position)
         _pos = self.to_parent(*-self.bottom_left)
         if pos == _pos:
             return
@@ -781,7 +1036,7 @@ class Sprite(Scatter):
         if self.body:
             xmin, ymin = xmax, ymax = self.body.local_to_world(self.bottom_left)
             for point in [(self.width, 0), (0, self.height), self.size]:
-                x, y = self.body.local_to_world(Vec2d(point) + self.bottom_left)
+                x, y = self.body.local_to_world(Vector(point) + self.bottom_left)
                 if x < xmin:
                     xmin = x
                 if y < ymin:
@@ -790,7 +1045,7 @@ class Sprite(Scatter):
                     xmax = x
                 if y > ymax:
                     ymax = y
-            return Vec2d(xmin, ymin), Vec2d(xmax - xmin, ymax - ymin)
+            return Vector(xmin, ymin), Vector(xmax - xmin, ymax - ymin)
         return super(Sprite, self).bbox
     bbox = AliasProperty(_get_bbox, None, bind=(
         'transform', 'width', 'height'))
@@ -801,7 +1056,7 @@ class Sprite(Scatter):
     def _set_center(self, center):
         if center == self.center:
             return False
-        t = Vec2d(*center) - self.center
+        t = Vector(*center) - self.center
         trans = Matrix().translate(t.x, t.y, 0)
         self.apply_transform(trans)
         if body:
@@ -809,7 +1064,7 @@ class Sprite(Scatter):
     center = AliasProperty(_get_center, _set_center, bind=('bbox', ))
 
     def _set_pos(self, pos):
-        self._set_position(Vec2d(pos) + self.offset)
+        self._set_position(Vector(pos) + self.offset)
 
     def _get_pos(self):
         if self.body:
@@ -859,19 +1114,19 @@ class Sprite(Scatter):
         for sprite in Sprite._instances:
             if sprite.space:
                 sprite.space.remove(*sprite.pymunk_shapes, sprite.body)
-        Sprite._instances = set()
+        Sprite._instances = WeakSet()
 
     @property
     def offset(self):
         if self.body:
             return self.body.position - self.bbox[0]
         cx, cy = self.to_parent(*-self.bottom_left)
-        return Vec2d(cx - self.x, cy - self.y)
+        return Vector(cx - self.x, cy - self.y)
 
     def _get_rotation(self):
         if self.body:
             return degrees(self.body.angle)
-        return (360 - (Vec2d(self.to_parent(0, 10)) - self.to_parent(0, 0)).get_angle_degrees_between((0, 10))) % 360
+        return (360 - (Vector(self.to_parent(0, 10)) - self.to_parent(0, 0)).get_angle_degrees_between((0, 10))) % 360
 
     def _set_rotation(self, rotation):
         # TODO: Add is_symmetric optimization
@@ -896,14 +1151,14 @@ class Sprite(Scatter):
             self.body.velocity = 0, 0
             self.body.angular_velocity = 0
         else:
-            _rotation = (360 - (Vec2d(self.to_parent(0, 10)) - self.to_parent(0, 0)).get_angle_degrees_between((0, 10))) % 360
+            _rotation = (360 - (Vector(self.to_parent(0, 10)) - self.to_parent(0, 0)).get_angle_degrees_between((0, 10))) % 360
             rotation = degrees(self.body.angle)
             angle_change = _rotation - rotation
             if angle_change != 0.0:
                 r = Matrix().rotate(-radians(angle_change), 0, 0, 1)
                 self.apply_transform(r, post_multiply=True,
                                      anchor=-self.body.center_of_gravity)
-            pos = Vec2d(self.body.position)
+            pos = Vector(self.body.position)
             _pos = self.to_parent(*-self.bottom_left)
             if pos == _pos:
                 return
@@ -928,7 +1183,7 @@ class Sprite(Scatter):
         #         if isinstance(shape, pymunk.Circle):
         #             body = shape.body
         #             shape.kivy[0].pos = body.position - (shape.radius, shape.radius) + shape.offset
-        #             circle_edge = body.position + shape.offset + Vec2d(shape.radius, 0).rotated(body.angle)
+        #             circle_edge = body.position + shape.offset + Vector(shape.radius, 0).rotated(body.angle)
         #             shape.kivy[1].points = [body.position.x + shape.offset.x, body.position.y + shape.offset.y, circle_edge.x, circle_edge.y]
         #         if isinstance(shape, pymunk.Segment):
         #             body = shape.body
@@ -1107,7 +1362,7 @@ class Sprite(Scatter):
 #                 if isinstance(shape, pymunk.Circle):
 #                     body = shape.body
 #                     shape.kivy[0].pos = body.position - (shape.radius, shape.radius) + shape.offset
-#                     circle_edge = body.position + shape.offset + Vec2d(shape.radius, 0).rotated(body.angle)
+#                     circle_edge = body.position + shape.offset + Vector(shape.radius, 0).rotated(body.angle)
 #                     shape.kivy[1].points = [body.position.x + shape.offset.x, body.position.y + shape.offset.y, circle_edge.x, circle_edge.y]
 #                 if isinstance(shape, pymunk.Segment):
 #                     body = shape.body
