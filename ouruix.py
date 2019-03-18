@@ -14,7 +14,7 @@ import re
 import ast
 # import jedi
 # from sys import getsizeof
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 
 from kivy.uix.textinput import FL_IS_LINEBREAK
 
@@ -43,8 +43,8 @@ from kivy.core.window import Window # request keyboard
 
 import pymunk
 
-from ourturtle import Turtle, Vec2d
-from sprite import Sprite, OurImage
+from ourturtle import Turtle
+from sprite import Sprite, OurImage, Vector
 from codean import autocomp, CodeRunner, Break, COMMON_CODE
 from sokoban.sokoban import Sokoban
 
@@ -70,12 +70,19 @@ def whos(vars, max_repr=40):
             for k, v in vars.items()
             if isinstance(v, w_types) and k[0] != '_']
 
+class Key(namedtuple('Key', ['keycode', 'key', 'text'])):
+    def __eq__(self, b):
+        if b in (self.keycode, self.key, self.text):
+            return True
+        return False
+    def __str__(self):
+        return f"Key '{self.key or self.text}' ({self.keycode})"
 
 class ActionStepSlider(BoxLayout, ActionItem):
     step = NumericProperty(0)
     max_step = NumericProperty(0)
 
-class CodeEditor(CodeInput):
+class CodeEditor(CodeInput, FocusBehavior):
     def __init__(self, **kwargs):
         # self._highlight_line = None
         self.hightlight_styles = {
@@ -89,6 +96,7 @@ class CodeEditor(CodeInput):
         self.ac_current = 0
         self.ac_position = None
         self.ac_completions = []
+        self.register_event_type('on_key_down')
         super(CodeEditor, self).__init__(**kwargs)
 
 
@@ -251,6 +259,10 @@ class CodeEditor(CodeInput):
         key, key_str = keycode
         print('kk', keycode, text, modifiers)
         if key == 9:  # Tab
+            if modifiers == ['ctrl']:
+                if self.focus_next:
+                    self.focus_next.focus = True
+                return True
             cc, cr = self.cursor
             _lines = self._lines
             text = _lines[cr]
@@ -338,14 +350,14 @@ class CodeEditor(CodeInput):
                 prev_line = self._lines[cr]
                 m = R_TURN.match(prev_line)
                 if m:
-                    space, cmd, steps = m.groups()
+                    space, cmd, step = m.groups()
                     if cmd == key_str:
-                        if steps:
-                            steps = str(int(steps)+1)
+                        if step:
+                            step = str(int(step)+1)
                         else:
-                            steps = '2'
-                        self._set_line_text(cr, space + cmd + '(' + steps + ')')
-                        # self._lines[cr-1] = space + cmd + '(' + steps + ')'
+                            step = '2'
+                        self._set_line_text(cr, space + cmd + '(' + step + ')')
+                        # self._lines[cr-1] = space + cmd + '(' + step + ')'
                         return True
             key_str = space + key_str
             if not empty_line:
@@ -354,10 +366,16 @@ class CodeEditor(CodeInput):
             self.insert_text(f'{key_str}()')
             # self.cursor = (cc, cr+1)
             return True
-        self.ac_begin = False
-        super(CodeInput, self).keyboard_on_key_down(window, keycode, text,
-                                                    modifiers)
 
+        if self.dispatch('on_key_down', window, keycode, text, modifiers):
+            return True
+
+        self.ac_begin = False
+        return super(CodeInput, self).keyboard_on_key_down(
+            window, keycode, text, modifiers)
+
+    def on_key_down(self, window, keycode, text, modifiers):
+        pass
 
 class Ball(Widget):
     def goto(self, x, y):
@@ -409,8 +427,9 @@ class OurSandbox(FocusBehavior, ScatterPlane):
         # self.space = pymunk.Space()
         # self.space.gravity = (0.0, -900.0)
         # self.space.sleep_time_threshold = 0.3
+        self.register_event_type('on_key_down')
         self.space = None
-        self._keyboard = None
+        # self._keyboard = None
 
         # self._keyboard = Window.request_keyboard(
         #     self._keyboard_closed, self, 'text')
@@ -433,25 +452,27 @@ class OurSandbox(FocusBehavior, ScatterPlane):
         by FocusBehavior. If we wanted to use tab for ourselves, we could just
         not call it, or call it if we didn't need tab.
         '''
-        print('DOWN2', keycode[1] or text, modifiers)
-        if super(OurSandbox, self).keyboard_on_key_down(window, keycode,
-                                                         text, modifiers):
+        print('DOWN', keycode, text, modifiers)
+        if self.dispatch('on_key_down', window, keycode, text, modifiers):
             return True
-        #self.text = keycode[1]
-        return True
+        return super(OurSandbox, self).keyboard_on_key_down(
+            window, keycode, text, modifiers)
 
-    def _keyboard_closed(self):
-        print('UNBIND')
-        self._keyboard.unbind(on_key_down=self.on_key_down, on_key_up=self.on_key_up)
-        self._keyboard = None
+    def on_key_down(self, window, keycode, text, modifiers):
+        pass
 
-    def on_key_down(self, keyboard, keycode, text, modifiers):
-        print('DOWN', keycode[1] or text, modifiers)
-        return True
+    # def _keyboard_closed(self):
+    #     print('UNBIND')
+    #     self._keyboard.unbind(on_key_down=self.on_key_down, on_key_up=self.on_key_up)
+    #     self._keyboard = None
 
-    def on_key_up(self, keyboard, keycode, *args):
-        # print('UP', chr(keycode[0]), args)
-        return True
+    # def on_key_down(self, keyboard, keycode, text, modifiers):
+    #     print('DOWN', keycode[1] or text, modifiers)
+    #     return True
+
+    # def on_key_up(self, keyboard, keycode, *args):
+    #     # print('UP', chr(keycode[0]), args)
+    #     return True
 
 
     def on_touch_down(self, touch):
@@ -531,13 +552,21 @@ class Playground(FloatLayout):
 #   pass
 
 
-    code = StringProperty('''b = add_sprite('square', x=0, y=-120, body_type=1)
-b.rotation = 9
+    code = StringProperty('''ball = add_sprite('circle', x=0, y=-120, body_type=0, color='green')
+ball.apply_impulse((50000, 0))
+
+platform = add_sprite('platform', x=250, y=-120, body_type=1, color='red')
+def on_key_press(key, modifiers):
+    if key == 'up':
+        platform.velocity.x += 15
+    if key == 'down':
+        platform.velocity.y -= 15
+
+    print(key, modifiers)
 
 def update(dt):
-    if steps > 500:
-        raise Break
-    print(steps)
+    pass
+
 ''')
 
       # print(123)
@@ -547,7 +576,7 @@ def update(dt):
   # 128907
 #     run_code = StringProperty('''
 # #x, y = t.pos()
-# #t.goto(300*sin(steps/(4)), 300*cos(steps/5))
+# #t.goto(300*sin(step/(4)), 300*cos(step/5))
 # #bob.left(1)
 # #bob.forward(1)
 # ''')
@@ -613,20 +642,38 @@ def update(dt):
             return sp
         globs['add_sprite'] = _add_sprite
 
+        def _add_line(*largs, **kvargs):
+            # self.sandbox.add_widget(line)
+            with self.sandbox.canvas:
+                line = Line(*largs, **kvargs)
+            return line
+        globs['Line'] = _add_line
+
         self.sokoban = Sokoban()
         def sokoban_go(dx, dy):
-            def go(steps=1):
-                self.sokoban.move_player(dx, dy, steps)
+            def go(step=1):
+                self.sokoban.move_player(dx, dy, step)
             return go
         globs['right'] = sokoban_go(1, 0)
         globs['left'] = sokoban_go(-1, 0)
         globs['up'] = sokoban_go(0, 1)
         globs['down'] = sokoban_go(0, -1)
 
+        # self._segments = []
+        # def _add_segment(point_a, point_b, radius=0.4, color='khaki'):
+        #     self._segments.append((point_a, point_b, radius, color))
+        # globs['Segment'] = _add_segment
+        self._gravity = Vector(0, 0)
+        def _set_gravity(g=(0, -900)):
+            if isinstance(g, (int, float)):
+                g = (0, g)
+            self._gravity = Vector(g)
+        globs['set_gravity'] = _set_gravity
+
         self.trigger_exec_update = Clock.create_trigger(self.execute_update, -1)
         self.update_schedule = None
 
-        self.runner = CodeRunner(globals=globs, special_funcs=['update'])
+        self.runner = CodeRunner(globals=globs, special_funcs=[F_UPDATE, F_ON_KEY_PRESS])
 
         self.code_editor.namespace = self.runner.globals  # FIXME?
 
@@ -645,11 +692,16 @@ def update(dt):
         # self.rpanel.add_widget(vs6, 1)
 
         # self.status = None
-        self.steps = self.prev_steps = 0
+        self._kb_events = []
+        self.step = self.prev_step = 0
         self.trigger_exec = Clock.create_trigger(self.execute_code, -1)
         self.bind(code=self.compile_code)
         self.bind(run_to_cursor=self.compile_code)
+        self.sandbox.bind(on_key_down=self.sandbox_on_key_down)
         self.code_editor.bind(cursor_row=self.on_code_editor_cursor_row)
+        self.code_editor.bind(on_key_down=self.code_editor_on_key_down)
+        self.code_editor.focus_next = self.sandbox
+        self.sandbox.focus_next = self.code_editor
 
         def _set_var(wid, value):
             self.vars[wid.var_name] = value
@@ -675,6 +727,26 @@ def update(dt):
         self.graphics_instructions = []
         # self.bind(run_code=self.compile_run)
         # self.compile_run()
+
+    def code_editor_on_key_down(self, widget, window, keycode, text, modifiers):
+        print('code_editor_on_key_down', keycode, text, modifiers)
+        if keycode[1] == 'f5':
+            self.step = 0
+            self.prev_step = 0
+            self.runner.reset()
+            self.trigger_exec()
+            return True
+
+    def sandbox_on_key_down(self, widget, window, keycode, text, modifiers):
+        if keycode[1] == 'f5':
+            self.step = 0
+            self.prev_step = 0
+            self.runner.reset()
+            self.trigger_exec()
+            return True
+        self._kb_events.append((
+            'down', time(),
+            Key(keycode=keycode[0], key=keycode[1], text=text), modifiers))
 
     def on_replay_step(self, *largs):
         if self.sokoban:
@@ -743,11 +815,11 @@ def update(dt):
                                 Color(*color)
                                 if shape == 'Ellipse':
                                     Ellipse(
-                                        pos=pos - 0.5 * Vec2d(size[0], size[1]),
+                                        pos=pos - 0.5 * Vector(size[0], size[1]),
                                         size=(size[0], size[1]))
                                 elif shape == 'Rectangle':
                                     Rectangle(
-                                        pos=pos - 0.5 * Vec2d(size[0], size[1]),
+                                        pos=pos - 0.5 * Vector(size[0], size[1]),
                                         size=(size[0], size[1]))
 
                         PushMatrix()
@@ -823,7 +895,8 @@ def update(dt):
                 changed.remove(COMMON_CODE)
             print('EXEC Changed:', changed)
             try:
-                if self.runner.execute(changed) and 'update' in self.runner.globals and not self.update_schedule.is_triggered:
+                if self.runner.execute(changed) and F_UPDATE in self.runner.globals and not self.update_schedule.is_triggered:
+                    self.update_schedule.cancel()
                     self.update_schedule()
             except Exception as e:
                 print('E3:', e)
@@ -833,10 +906,11 @@ def update(dt):
         print('execute_code')
         self.status = ('EXEC',)
         self.runner.reset(globals=self.vars)
-        self.prev_steps = max(self.steps, self.prev_steps)
-        self.steps = 0
+        self.prev_step = max(self.step, self.prev_step)
+        self.step = 0
         # self.runner.set_globals(self.vars, False)
         Turtle.clear_turtles()
+        self._segments = []
         # Sprite.clear_sprites()  # FIXME
 
         turtle = Turtle()  # self.sandbox.add_turtle()
@@ -855,28 +929,29 @@ def update(dt):
         if self.sandbox.space:
             self.sandbox.space.remove(*self.sandbox.space.shapes, *self.sandbox.space.bodies)
         self.sandbox.space = pymunk.Space()
-        self.sandbox.space.gravity = (0.0, -900.0)
-        self.sandbox.space.sleep_time_threshold = 0.3
+        self.sandbox.space.gravity = self._gravity
+        self.sandbox.space.sleep_time_threshold = 3.0
         self.sandbox.space.replay_mode = False
         # for widget in saved:
             # self.sandbox.add_widget(widget)
-        self.sandbox.add_widget(Sprite('sokoban/images/player.png', x=0, y=250, body_type=0))
-        self.sandbox.add_widget(Sprite('turtle', x=-50, y=50, body_type=0))
-        self.sandbox.add_widget(Sprite('circle', x=0, y=0, body_type=0))
-        self.sandbox.add_widget(Sprite('circle', x=0, y=40, body_type=0))
-        self.sandbox.add_widget(Sprite('circle', x=0, y=80, body_type=0))
-        self.sandbox.add_widget(Sprite('square', x=0, y=120, body_type=0))
-        self.sandbox.add_widget(Sprite('circle', x=0, y=160, body_type=0))
-        self.sandbox.add_widget(Sprite('circle', x=0, y=200, body_type=0))
+        # self.sandbox.add_widget(Sprite('sokoban/images/player.png', x=0, y=250, body_type=0))
+        # self.sandbox.add_widget(Sprite('turtle', x=-50, y=50, body_type=0))
+        # self.sandbox.add_widget(Sprite('circle', x=0, y=0, body_type=0))
+        # self.sandbox.add_widget(Sprite('circle', x=0, y=40, body_type=0))
+        # self.sandbox.add_widget(Sprite('platform', x=-300, y=80, body_type=1))
+        # self.sandbox.add_widget(Sprite('square', x=0, y=120, body_type=0))
+        # self.sandbox.add_widget(Sprite('circle', x=0, y=160, body_type=0))
+        # self.sandbox.add_widget(Sprite('platform', x=300, y=200, body_type=1))
 
         static_body = self.sandbox.space.static_body
-        static_lines = [pymunk.Segment(static_body, (-311.0, 280.0-400), (0.0, 246.0-400), 0.0),
-                        pymunk.Segment(static_body, (0.0, 246.0-400), (607.0, 343.0-400), 0.0)
-                        ]
-        for line in static_lines:
-            line.elasticity = 0.95
-            line.friction = 0.9
-        self.sandbox.space.add(static_lines)
+        # for a, b, radius, color in self._segments:
+        # static_lines = [pymunk.Segment(static_body, (-311.0, 280.0-400), (0.0, 246.0-400), 0.0),
+                        # pymunk.Segment(static_body, (0.0, 246.0-400), (607.0, 343.0-400), 0.0)
+                        # ]
+        # for line in static_lines:
+        #     line.elasticity = 0.95
+        #     line.friction = 0.9
+        # self.sandbox.space.add(static_lines)
 
         seed(123)
         ok = False
@@ -889,11 +964,11 @@ def update(dt):
         for v, t, r in whos(self.runner.globals):
             watches += f'{v}\t{t}\t{r}\n'
 
-        if ok and 'update' in self.runner.globals and self.prev_steps > 0:
-            # print('Replay:', prev_steps)
+        if ok and F_UPDATE in self.runner.globals and self.prev_step > 0:
+            # print('Replay:', prev_step)
             t_start = time()
-            self._last_update_time = time() - self.prev_steps * 1/30
-            for i in range(self.prev_steps):
+            self._last_update_time = time() - self.prev_step * 1/30
+            for i in range(self.prev_step):
                 self.execute_update(0.0, True)
             Sprite.update_from_pymunk(False)
             print('Replay time:', (time() - t_start) * 1000, 'ms')
@@ -907,8 +982,8 @@ def update(dt):
         # FIXME: add scene spdiff
         self.update_sandbox()
         if self.sokoban:
-            self.replay_steps = len(self.sokoban.log)
             self.replay_step = len(self.sokoban.log)
+            self.replay_steps = len(self.sokoban.log)
 
         # self.code_editor.highlight_line(None)
         if not ok:
@@ -960,8 +1035,10 @@ def update(dt):
                 self.sokoban.level += 1
                 self.sandbox.clear_widgets()
                 # self.sokoban.draw_level(self.sandbox)
-            if 'update' in self.runner.globals:  # and (not self.update_schedule or not self.update_schedule.is_triggered):
+            if F_UPDATE in self.runner.globals:  # and (not self.update_schedule or not self.update_schedule.is_triggered):
                 self._last_update_time = time()
+                if self.update_schedule:
+                    self.update_schedule.cancel()
                 self.update_schedule = Clock.schedule_interval(self.trigger_exec_update, 1.0 / 30.0)
 
         self.watches = watches
@@ -979,25 +1056,38 @@ def update(dt):
 
     def execute_update(self, dt, replay=False):
         self.sandbox.space.replay_mode = replay
-        self.steps += 1
+        self.step += 1
         self.runner.globals.update(self.vars)
-        self.runner.globals['steps'] = self.steps
+        self.runner.globals['step'] = self.step
         if not replay:
             ts_pos = self.runner.text_stream.tell()
             now = time()
         else:
-            now = self._last_update_time + self.steps * 1 / 30
+            now = self._last_update_time + self.step * 1 / 30
         dt = now - self._last_update_time
 
         try:
-            self.runner.call_if_exists('update', dt)
+            while self._kb_events:
+                ev, t, key, modifiers = self._kb_events[0]
+                if ev == 'down':
+                    self.runner.call_if_exists(F_ON_KEY_PRESS, key, modifiers)
+                self._kb_events.pop(0)
+            self.runner.call(F_UPDATE, dt)
 
-        except:
+        except Exception as e:
             self.update_schedule.cancel()
             watches = ''
             for v, t, r in whos(self.runner.globals):
                 watches += f'{v}\t{t}\t{r}\n'
-            exc, exc_str, traceback = self.runner.exception
+            if self.runner.exception:
+                exc, exc_str, traceback = self.runner.exception
+            else:
+                exc = e
+                if hasattr(e, 'message'):
+                    exc_str = e.message
+                else:
+                    exc_str = str(e) or e.__class__.__name__
+                traceback = self.runner._trace(e.__traceback__)
             print('EXC:', exc_str)
             is_break = isinstance(exc, Break)
             if is_break:
