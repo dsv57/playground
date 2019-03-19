@@ -6,6 +6,7 @@ from random import random, randint, uniform, choice, seed
 from math import sin, cos, atan2, sqrt, ceil, floor, degrees, radians, log, pi, exp
 from copy import deepcopy
 from time import process_time, time
+from os.path import exists
 # from sys import exc_info
 import re
 
@@ -72,9 +73,10 @@ def whos(vars, max_repr=40):
 
 class Key(namedtuple('Key', ['keycode', 'key', 'text'])):
     def __eq__(self, b):
-        if b in (self.keycode, self.key, self.text):
+        if b is not None and b in (self.keycode, self.key, self.text):
             return True
         return False
+
     def __str__(self):
         return f"Key '{self.key or self.text}' ({self.keycode})"
 
@@ -428,6 +430,7 @@ class OurSandbox(FocusBehavior, ScatterPlane):
         # self.space.gravity = (0.0, -900.0)
         # self.space.sleep_time_threshold = 0.3
         self.register_event_type('on_key_down')
+        self.register_event_type('on_key_up')
         self.space = None
         # self._keyboard = None
 
@@ -459,6 +462,15 @@ class OurSandbox(FocusBehavior, ScatterPlane):
             window, keycode, text, modifiers)
 
     def on_key_down(self, window, keycode, text, modifiers):
+        pass
+
+    def keyboard_on_key_up(self, window, keycode):
+        if self.dispatch('on_key_up', window, keycode):
+            return True
+        return super(OurSandbox, self).keyboard_on_key_up(
+            window, keycode)
+
+    def on_key_up(self, window, keycode):
         pass
 
     # def _keyboard_closed(self):
@@ -558,9 +570,9 @@ ball.apply_impulse((50000, 0))
 platform = add_sprite('platform', x=250, y=-120, body_type=1, color='red')
 def on_key_press(key, modifiers):
     if key == 'up':
-        platform.velocity.x += 15
+        platform.velocity += 0, 15
     if key == 'down':
-        platform.velocity.y -= 15
+        platform.velocity -= 0, 15
 
     print(key, modifiers)
 
@@ -569,22 +581,6 @@ def update(dt):
 
 ''')
 
-      # print(123)
-  # bob.setheading(a)
-  # bob.forward(1)
-  # bob.right(2)
-  # 128907
-#     run_code = StringProperty('''
-# #x, y = t.pos()
-# #t.goto(300*sin(step/(4)), 300*cos(step/5))
-# #bob.left(1)
-# #bob.forward(1)
-# ''')
-
-    #    var_a = NumericProperty(0.5)
-    #    var_b = NumericProperty(0.5)
-    #    var_m = NumericProperty(10)
-    #    var_n = NumericProperty(10)
     vars = DictProperty({})
 
     status = ObjectProperty((None, ))
@@ -673,7 +669,7 @@ def update(dt):
         self.trigger_exec_update = Clock.create_trigger(self.execute_update, -1)
         self.update_schedule = None
 
-        self.runner = CodeRunner(globals=globs, special_funcs=[F_UPDATE, F_ON_KEY_PRESS])
+        self.runner = CodeRunner(globals=globs, special_funcs=[F_UPDATE, F_ON_KEY_PRESS, F_ON_KEY_RELEASE])
 
         self.code_editor.namespace = self.runner.globals  # FIXME?
 
@@ -698,6 +694,7 @@ def update(dt):
         self.bind(code=self.compile_code)
         self.bind(run_to_cursor=self.compile_code)
         self.sandbox.bind(on_key_down=self.sandbox_on_key_down)
+        self.sandbox.bind(on_key_up=self.sandbox_on_key_up)
         self.code_editor.bind(cursor_row=self.on_code_editor_cursor_row)
         self.code_editor.bind(on_key_down=self.code_editor_on_key_down)
         self.code_editor.focus_next = self.sandbox
@@ -707,6 +704,10 @@ def update(dt):
             self.vars[wid.var_name] = value
             if wid.var_name in self.runner.common_vars:
                 self.trigger_exec()
+
+        if exists('source.py'):
+            with open('source.py') as f:
+                self.code = f.read()
 
         # FIXME
         # vs1.bind(value=_set_var)
@@ -747,6 +748,11 @@ def update(dt):
         self._kb_events.append((
             'down', time(),
             Key(keycode=keycode[0], key=keycode[1], text=text), modifiers))
+
+    def sandbox_on_key_up(self, widget, window, keycode):
+        self._kb_events.append((
+            'up', time(),
+            Key(keycode=keycode[0], key=keycode[1], text=None), None))
 
     def on_replay_step(self, *largs):
         if self.sokoban:
@@ -828,7 +834,7 @@ def update(dt):
                         Scale(size)
                         Rotate(angle=t.heading(), axis=(0, 0, 1), origin=(0, 0))
                         Color(*t._pencolor)
-                        Triangle(points=[0, -10, 30, 0, 0, 10])
+                        # Triangle(points=[0, -10, 30, 0, 0, 10])  # FIXME
                         PopMatrix()
                     # for s in Sprite._instances:
                     #     s.draw()
@@ -874,6 +880,12 @@ def update(dt):
 
         try:
             changed = self.runner.parse(self.code, breakpoint)
+            if changed:
+                try:
+                    with open('source.py', 'w') as f:
+                        f.write(self.code)
+                except Exception as e:
+                    print("Cannot save file:", e)
             if COMMON_CODE in changed:
                 self.runner.reset()
 
@@ -1039,7 +1051,7 @@ def update(dt):
                 self._last_update_time = time()
                 if self.update_schedule:
                     self.update_schedule.cancel()
-                self.update_schedule = Clock.schedule_interval(self.trigger_exec_update, 1.0 / 30.0)
+                self.update_schedule = Clock.schedule_interval(self.trigger_exec_update, 1.0 / 60.0)
 
         self.watches = watches
         print('= ' * 40)
@@ -1071,6 +1083,8 @@ def update(dt):
                 ev, t, key, modifiers = self._kb_events[0]
                 if ev == 'down':
                     self.runner.call_if_exists(F_ON_KEY_PRESS, key, modifiers)
+                elif ev == 'up':
+                    self.runner.call_if_exists(F_ON_KEY_RELEASE, key)
                 self._kb_events.pop(0)
             self.runner.call(F_UPDATE, dt)
 
