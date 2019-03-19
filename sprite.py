@@ -39,80 +39,10 @@ import numpy as np  # OurImage
 import pymunk
 import pymunk.autogeometry
 from pymunk import Body
-from pymunk.vec2d import Vec2d
+from pymunk.vec2d import Vector
 from named_colors import COLORS
 
-
-class Vector(Vec2d):
-    __slots__ = ("x", "y")
-
-    def __init__(self, x_or_pair=None, y=None):
-        if x_or_pair != None:
-            if y == None:
-                if hasattr(x_or_pair, "x") and hasattr(x_or_pair, "y"):
-                    self.x = float(x_or_pair.x)
-                    self.y = float(x_or_pair.y)
-                # elif isinstance(x_or_pair, Mapping) and 'angle' in x_or_pair and 'radius' in x_or_pair:
-                #     r = float(x_or_pair['radius'])
-                #     a = float(x_or_pair['angle'])
-                #     self.x = r * cos(a)
-                #     self.y = r * sin(a)
-                else:
-                    self.x = float(x_or_pair[0])
-                    self.y = float(x_or_pair[1])
-            else:
-                self.x = float(x_or_pair)
-                self.y = float(y)
-        else:
-            self.x = 0
-            self.y = 0
-
-    @classmethod
-    def polar(cls, angle, radius=1):
-        r = float(radius)
-        a = float(angle)
-        return cls(r * cos(a), r * sin(a))
-
-    @classmethod
-    def polar_degrees(cls, angle, radius=1):
-        return cls.polar(radians(angle), radius)
-
-    def __repr__(self):
-        return 'Vector(%s, %s)' % (self.x, self.y)
-
-    def __str__(self):
-        return str(tuple(self))
-
-    def __eq__(self, other):
-        return tuple(self) == tuple(other)
-
-    def get_length_sqrd(self):
-        return self.x * self.x + self.y * self.y
- 
-    def get_length(self):
-        return hypot(self.x, self.y)
-
-    def get_distance(self, other):
-        return hypot(self.x - other[0], self.y - other[1])
-
-    def get_dist_sqrd(self, other):
-        dx = self.x - other[0]
-        dy = self.y - other[1]
-        return dx * dx + dy * dy
-
-    def __format__(self, fmt_spec=''):
-        if fmt_spec.endswith('p'):
-            fmt_spec = fmt_spec[:-1]
-            coords = (abs(self), self.angle())
-            outer_fmt = '<{}, {}>'
-        else:
-            coords = self
-            outer_fmt = '({}, {})'
-            components = (format(c, fmt_spec) for c in coords)
-        return outer_fmt.format(*components)
-
-    def __hash__(self):
-        return hash(self.x) ^ hash(self.y)
+from playground.vector import Vector, VectorRef, VectorRefProperty
 
 
 def trace_image(img, threshold=3, simplify_tolerance=0.7, cache=True):
@@ -592,10 +522,21 @@ class Rectangle(object):
 
     def __init__(self, corner=(0, 0), size=(50, 50)):
         super(Rectangle, self).__init__()
-        self.corner = Vector(corner or (0, 0))
+        self._corner = Vector(corner or (0, 0))
         if isinstance(size, Number):
             size = size, size
-        self.size = Vector(size or (50, 50))
+        self._size = Vector(size or (50, 50))
+        
+        # self.corner = self._corner.ref()
+        # self.size = self._size.ref()
+
+    def __repr__(self):
+        return f'Rectangle(({self._corner.x}, {self._corner.y}), ({self._size.x}, {self._size.y}))'
+
+    def __eq__(self, other):
+        if isinstance(other, Rectangle):
+            return self._corner == other._corner and self._size == other._size
+        return False
 
     @classmethod
     def from_center(cls, center=(0, 0), size=(50, 50)):
@@ -607,83 +548,47 @@ class Rectangle(object):
     def from_corners(cls, from_corner=(0,0), to_corner=(50, 50)):
         return cls(from_corner, Vector(to_corner) - from_corner)
 
-    def __repr__(self):
-        return f'Rectangle(({self.corner.x}, {self.corner.y}), ({self.size.x}, {self.size.y}))'
+    @property
+    def corner(self):
+        return self._corner.ref()
+
+    @corner.setter
+    def corner(self, value):
+        self._corner = Vector(value)
 
     @property
-    def x(self):
-        return self.corner.x
-    
-    @x.setter
-    def x(self, x):
-        self.corner.x = x
+    def size(self):
+        return self._size.ref()
 
-    @property
-    def y(self):
-        return self.corner.y
+    @size.setter
+    def size(self, value):
+        self._size = Vector(value)
+
+    def _get_center(self):
+        return self._corner + self._size / 2
     
-    @y.setter
-    def y(self, y):
-        self.corner.y = y
+    def _set_center(self, center):
+        self._corner = center - self._size / 2
+    center = VectorRefProperty(_get_center, _set_center)
+    
+    # corner = VectorRefProperty('_corner')
+    # size = VectorRefProperty('_size')
 
     # @property
-    # def corner(self):
-    #     return self._corner
+    # def width(self):
+    #     return self.size.x
     
-    # @corner.setter
-    # def corner(self, corner):
-    #     self._corner = corner
+    # @width.setter
+    # def width(self, width):
+    #     self.size.x = width
 
     # @property
-    # def size(self):
-    #     return self._size
+    # def height(self):
+    #     return self.size.y
     
-    # @size.setter
-    # def size(self, size):
-    #     self._size = size
-
-    @property
-    def width(self):
-        return self.size.x
-    
-    @width.setter
-    def width(self, width):
-        self.size.x = width
-
-    @property
-    def height(self):
-        return self.size.y
-    
-    @height.setter
-    def height(self, height):
-        self.size.y = height
-
-    @property
-    def center(self):
-        return self.corner + self.size / 2
-    
-    @center.setter
-    def center(self, center):
-        self.corner = center - self.size / 2
-
-    @property
-    def center_x(self):
-        return self.corner.x + self.size.x / 2
-    
-    @center_x.setter
-    def center_x(self, x):
-        self.corner.x = x - self.size.x / 2
-
-    @property
-    def center_y(self):
-        return self.corner.y + self.size.y / 2
-    
-    @center_y.setter
-    def center_y(self, y):
-        self.corner.y = y - self.size.y / 2
-
-    def __eq__(self, other):
-        return self.corner == other.corner and self.size == other.size
+    # @height.setter
+    # def height(self, height):
+    #     self.size.y = height
 
 
 class Sprite(Scatter):
@@ -833,6 +738,9 @@ class Sprite(Scatter):
                     Color(*(COLORS.get(color) or (1, 0, 0)))
                     self.shapes.append(
                         Ellipse(pos=(0, 0), size=(r * 2, r * 2)))
+                    Color(0, 0, 0)
+                    self.shapes.append(
+                        Line(points=[r, r, 2 * r, r], width=2))
                     cir = pymunk.Circle(self.body, r, (0, 0))
                     if body_type == Body.DYNAMIC:
                         cir.density = density
