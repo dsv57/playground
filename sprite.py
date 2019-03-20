@@ -39,7 +39,7 @@ import numpy as np  # OurImage
 import pymunk
 import pymunk.autogeometry
 from pymunk import Body
-from pymunk.vec2d import Vector
+# from pymunk.vec2d import Vec2d
 from named_colors import COLORS
 
 from playground.vector import Vector, VectorRef, VectorRefProperty
@@ -518,77 +518,6 @@ class OurImage(Image):
 
 
 
-class Rectangle(object):
-
-    def __init__(self, corner=(0, 0), size=(50, 50)):
-        super(Rectangle, self).__init__()
-        self._corner = Vector(corner or (0, 0))
-        if isinstance(size, Number):
-            size = size, size
-        self._size = Vector(size or (50, 50))
-        
-        # self.corner = self._corner.ref()
-        # self.size = self._size.ref()
-
-    def __repr__(self):
-        return f'Rectangle(({self._corner.x}, {self._corner.y}), ({self._size.x}, {self._size.y}))'
-
-    def __eq__(self, other):
-        if isinstance(other, Rectangle):
-            return self._corner == other._corner and self._size == other._size
-        return False
-
-    @classmethod
-    def from_center(cls, center=(0, 0), size=(50, 50)):
-        if isinstance(size, Number):
-            size = size, size
-        return cls(Vector(center) - Vector(size) / 2, size)
-
-    @classmethod
-    def from_corners(cls, from_corner=(0,0), to_corner=(50, 50)):
-        return cls(from_corner, Vector(to_corner) - from_corner)
-
-    @property
-    def corner(self):
-        return self._corner.ref()
-
-    @corner.setter
-    def corner(self, value):
-        self._corner = Vector(value)
-
-    @property
-    def size(self):
-        return self._size.ref()
-
-    @size.setter
-    def size(self, value):
-        self._size = Vector(value)
-
-    def _get_center(self):
-        return self._corner + self._size / 2
-    
-    def _set_center(self, center):
-        self._corner = center - self._size / 2
-    center = VectorRefProperty(_get_center, _set_center)
-    
-    # corner = VectorRefProperty('_corner')
-    # size = VectorRefProperty('_size')
-
-    # @property
-    # def width(self):
-    #     return self.size.x
-    
-    # @width.setter
-    # def width(self, width):
-    #     self.size.x = width
-
-    # @property
-    # def height(self):
-    #     return self.size.y
-    
-    # @height.setter
-    # def height(self, height):
-    #     self.size.y = height
 
 
 class Sprite(Scatter):
@@ -711,7 +640,10 @@ class Sprite(Scatter):
                 with self.canvas:
                     PushMatrix()
                     Translate(-min_x, -min_y)
-                    Color(*(COLORS.get(color) or (1, 0, 0)))
+                    if isinstance(color, str):
+                        Color(*(COLORS.get(color) or (1, 0, 0)))
+                    else:
+                        Color(*color)
                     for vertices, indices in tess.meshes:
                         # offset_vs = [v - (min_x, min_y)[i % 2] for i, v in enumerate(vertices)]
                         self.shapes.append(
@@ -735,7 +667,10 @@ class Sprite(Scatter):
                 self.size = (2 * r, 2 * r)
                 self.bottom_left = Vector(-r, -r)
                 with self.canvas:
-                    Color(*(COLORS.get(color) or (1, 0, 0)))
+                    if isinstance(color, str):
+                        Color(*(COLORS.get(color) or (1, 0, 0)))
+                    else:
+                        Color(*color)
                     self.shapes.append(
                         Ellipse(pos=(0, 0), size=(r * 2, r * 2)))
                     Color(0, 0, 0)
@@ -1034,7 +969,7 @@ class Sprite(Scatter):
     def _get_rotation(self):
         if self.body:
             return degrees(self.body.angle)
-        return (360 - (Vector(self.to_parent(0, 10)) - self.to_parent(0, 0)).get_angle_degrees_between((0, 10))) % 360
+        return (360 - (Vector(self.to_parent(0, 10)) - self.to_parent(0, 0)).angle_between((0, 10))) % 360
 
     def _set_rotation(self, rotation):
         # TODO: Add is_symmetric optimization
@@ -1059,7 +994,7 @@ class Sprite(Scatter):
             self.body.velocity = 0, 0
             self.body.angular_velocity = 0
         else:
-            _rotation = (360 - (Vector(self.to_parent(0, 10)) - self.to_parent(0, 0)).get_angle_degrees_between((0, 10))) % 360
+            _rotation = (360 - (Vector(self.to_parent(0, 10)) - self.to_parent(0, 0)).angle_between((0, 10))) % 360
             rotation = degrees(self.body.angle)
             angle_change = _rotation - rotation
             if angle_change != 0.0:
