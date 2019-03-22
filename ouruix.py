@@ -41,6 +41,7 @@ from kivy.cache import Cache
 from kivy.utils import escape_markup
 from kivy.core.text.markup import MarkupLabel
 from kivy.core.window import Window # request keyboard
+from kivy.graphics.opengl import glEnable
 
 import pymunk
 
@@ -55,6 +56,8 @@ except:
     pass
 
 # https://github.com/kivy/kivy/wiki/Working-with-Python-threads-inside-a-Kivy-application
+
+GL_FRAMEBUFFER_SRGB_EXT = 36281
 
 F_UPDATE = 'update'
 F_ON_KEY_PRESS = 'on_key_press'
@@ -432,6 +435,7 @@ class OurSandbox(FocusBehavior, ScatterPlane):
         self.register_event_type('on_key_down')
         self.register_event_type('on_key_up')
         self.space = None
+
         # self._keyboard = None
 
         # self._keyboard = Window.request_keyboard(
@@ -601,6 +605,8 @@ def update(dt):
 
     def __init__(self, **kwargs):
         super(Playground, self).__init__(**kwargs)
+        with self.canvas.before:
+            glEnable(GL_FRAMEBUFFER_SRGB_EXT)
 
         self._run_vars = None
         self._last_update_time = None
@@ -674,13 +680,13 @@ def update(dt):
         self.code_editor.namespace = self.runner.globals  # FIXME?
 
         # FIXME
-        # vs1 = VarSlider(var_name='a', min=0, max=360, type='float')
+        vs1 = VarSlider(var_name='a', min=0, max=360, type='float')
         # vs2 = VarSlider(var_name='b', type='float')
         # vs3 = VarSlider(var_name='c', type='float')
         # vs4 = VarSlider(var_name='l', min=0, max=50)
         # vs5 = VarSlider(var_name='m', min=0, max=100)
         # vs6 = VarSlider(var_name='n', min=0, max=150)
-        # self.rpanel.add_widget(vs1, 1)
+        self.rpanel.add_widget(vs1, 1)
         # self.rpanel.add_widget(vs2, 1)
         # self.rpanel.add_widget(vs3, 1)
         # self.rpanel.add_widget(vs4, 1)
@@ -710,7 +716,7 @@ def update(dt):
                 self.code = f.read()
 
         # FIXME
-        # vs1.bind(value=_set_var)
+        vs1.bind(value=_set_var)
         # vs2.bind(value=_set_var)
         # vs3.bind(value=_set_var)
         # vs4.bind(value=_set_var)
@@ -801,6 +807,11 @@ def update(dt):
                 # self.sokoban.draw_level(self.sandbox)  # FIXME
 
                 with self.sandbox.canvas:
+                    Color(0.3, 0, 0)
+                    Ellipse(pos=(100, 100), size=(200, 200))
+                    Color(0.0732, 0, 0)
+                    Ellipse(pos=(300, 100), size=(200, 200))
+
                     for t in Turtle.turtles():
                         for color, width, points in t._lines:
                             # if self.run_to_cursor:
@@ -818,6 +829,11 @@ def update(dt):
                             # if self.run_to_cursor:
                             # color = *color[:3], 0.5
                             with self.sandbox.canvas:
+                                Color(0.3, 0, 0)
+                                Ellipse(pos=(100, 100), size=(200, 200))
+                                Color(0.0732, 0, 0)
+                                Ellipse(pos=(300, 100), size=(200, 200))
+
                                 Color(*color)
                                 if shape == 'Ellipse':
                                     Ellipse(

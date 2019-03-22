@@ -69,12 +69,6 @@
 #        width: '48dp' if len(self.text) < 4 else str(24*int(len(self.text)/2.2))+'dp'
 #        #width: self.texture_size[0] + dp(24)
 #        multiline: False
-    Label:
-        text: root.var_name + ' = ' + root._str(root.value)
-        text_size: self.width, None
-        size_hint: None, None
-        height: '32dp'
-        width: '64dp'
     Label: # TextInput:
         text: str(root.min)
         # on_text: root.min = root._to_numtype(args[1])

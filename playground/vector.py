@@ -224,10 +224,12 @@ class Vector(object):
     def __invert__(self):
         return Vector(-self.x, -self.y)
 
-    def ref(self):
+    def ref(self, set_hook=None):
         def fset(x, y):
             self.x = x
             self.y = y
+            if set_hook is not None:
+                set_hook(self, x, y)
         return VectorRef(lambda: self, fset)
 
     def rotate(self, angle):
