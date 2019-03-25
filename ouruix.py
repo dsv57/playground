@@ -49,6 +49,8 @@ from ourturtle import Turtle
 from sprite import Sprite, OurImage, Vector
 from codean import autocomp, CodeRunner, Break, COMMON_CODE
 from sokoban.sokoban import Sokoban
+from playground.shapes import Stroke, Physics, Shape, Circle, Rectangle
+from playground.geometry import Vector, VectorRef, Transform
 
 try:
     import mycolors

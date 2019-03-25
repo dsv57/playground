@@ -1,5 +1,5 @@
 import operator
-from math import sin, cos, radians, degrees, atan2
+from math import sin, cos, tan, atan2, radians, degrees, hypot
 from numbers import Number
 from collections.abc import Iterable
 
@@ -701,4 +701,181 @@ class VectorRefProperty(object):
 
 
 
+class Transform(object):
+    __slots__ = ('a', 'b', 'c', 'd', 'tx', 'ty')
+    
+    def __init__(self, *largs, translate=None, rotate=None, scale=None, skew=None, anchor=(0, 0)):  # a=None, b=None, c=None, d=None, tx=None, ty=None):
+        if largs:
+            self.a, self.b, self.c, self.d, self.tx, self.ty = largs
+        else:
+            self.a = 1.
+            self.b = 0.
+            self.c = 0.
+            self.d = 1.
+            self.tx = 0.
+            self.ty = 0.
+        if rotate:
+            self.rotate(rotate, anchor)
+        if scale:
+            if isinstance(scale, Iterable) and len(scale) == 2:
+                self.scale(*scale, anchor=anchor)
+            else:
+                self.scale(scale, anchor=anchor)
+        if skew:
+            if isinstance(skew, Iterable) and len(skew) == 2:
+                self.skew(*skew, anchor=anchor)
+            else:
+                self.skew(skew, anchor=anchor)
+        if translate:
+            self += translate
 
+    @property
+    def matrix(self):
+        return [
+            [self.a, self.b, self.tx],
+            [self.c, self.d, self.ty],
+            [0., 0., 1.]]
+
+    @matrix.setter
+    def matrix(self, matrix):
+        self.a = float(matrix[0][0])
+        self.b = float(matrix[0][1])
+        self.c = float(matrix[1][0])
+        self.d = float(matrix[1][1])
+        self.tx = float(matrix[0][2])
+        self.ty = float(matrix[1][2])
+
+    def __getitem__(self, i):
+        if isinstance(i, int):
+            return (self.a, self.b, self.c, self.d, self.tx, self.ty)[i]
+        elif isinstance(i, tuple) and len(i) == 2:
+            if i[0] == 0:
+                return (self.a, self.b, self.tx)[i[1]]
+            elif i[0] == 1:
+                return (self.c, self.d, self.ty)[i[1]]
+            elif i[0] == 2:
+                return (1., 0., 0.)[i[1]]
+        raise IndexError()
+
+    def __repr__(self):
+        return f'{self.__class__.__name__}(a={self.a}, b={self.b}, ' \
+               f'c={self.c}, d={self.d}, tx={self.tx}, ty={self.ty})'
+
+    def __iter__(self):
+        yield self.a
+        yield self.b
+        yield self.c
+        yield self.d
+        yield self.tx
+        yield self.ty
+
+    def __len__(self):
+        return 6
+
+    def __hash__(self):
+        return hash(self.a) ^ hash(self.b) ^ hash(self.c) \
+            ^ hash(self.d) ^ hash(self.tx) ^ hash(self.ty)
+
+    def __eq__(self, other):  # FIXME: isinstance
+        if isinstance(other, Iterable) and len(other) >= 2:
+            return all(self[i, j] == other[i, j] for i in range(2) for j in range(3))
+        return False
+    
+    def __ne__(self, other):  # FIXME: isinstance
+        if isinstance(other, Iterable) and len(other) >= 2:
+            return any(self[i, j] != other[i, j] for i in range(2) for j in range(3))
+        return True
+ 
+    def __add__(self, other):
+        if isinstance(other, Iterable) and len(other) == 2:
+            return Transform(*self, translate=other)
+        raise TypeError('unsupported operand type')
+
+    def __iadd__(self, other):
+        if isinstance(other, Iterable) and len(other) == 2:
+            self.translate(*other)
+            return self
+        raise TypeError('unsupported operand type')
+
+    def __sub__(self, other):
+        if isinstance(other, Iterable) and len(other) == 2:
+            return Transform(*self, translate=(-other[0], -other[1]))
+        raise TypeError('unsupported operand type')
+
+    def __isub__(self, other):
+        if isinstance(other, Iterable) and len(other) == 2:
+            tx, ty = other
+            self.translate(-tx, -ty)
+            return self
+        raise TypeError('unsupported operand type')
+
+    def translate(self, tx, ty):
+        self.tx += float(tx)
+        self.ty += float(ty)
+
+    def rotate(self, angle, anchor=(0, 0)):
+        c = cos(radians(angle))
+        s = sin(radians(angle))
+        self.combine(Transform(c, s, -s, c, 0, 0), anchor=anchor)
+
+    def scale(self, sx, sy=None, anchor=(0, 0)):
+        if sy == None:
+            # if isinstance(sx, Iterable) and len(sx) == 2:
+            #     sx, sy = sx
+            # else:
+            sy = sx
+        self.combine(Transform(sx, 0, 0, sy, 0, 0), anchor=anchor)
+
+    def skew(self, ax, ay=0, anchor=(0, 0)):
+        self.combine(Transform(1, tan(radians(ay)), tan(radians(ax)), 1, 0, 0), anchor=anchor)
+
+    def _reflect_unit(self, ux, uy, anchor=(0, 0)):
+        self.combine(Transform(
+            2.0 * ux * ux - 1.0, 2.0 * ux * uy,
+            2.0 * ux * uy, 2.0 * uy * uy - 1.0,
+            0.0, 0.0), anchor=anchor)
+
+    def reflect(self, x, y, anchor=(0, 0)):
+        h = hypot(x, y)
+        self._reflect_unit(x / h, y / h, anchor)
+
+    def reflect_angle(self, angle, anchor=(0, 0)):
+        h = hypot(x, y)
+        self._reflect_unit(cos(radians(angle)), sin(radians(angle)), anchor)
+
+    # reflection
+
+    def combine(self, other, apply_before=False, anchor=(0, 0)):
+        a, b, c, d, tx, ty = other
+        ax, ay = anchor
+        t = Transform(a, b, c, d, a*ax + b*ay + tx - ax, c*ax + d*ay + ty - ay)
+
+        if apply_before:
+            t @= self
+            self.a = t.a
+            self.b = t.b
+            self.c = t.c
+            self.d = t.d
+            self.tx = t.tx
+            self.ty = t.ty
+        else:
+            self @= t
+
+    def __imatmul__(self, other):
+        self.a = self.a*other.a + self.b*other.c
+        self.b = self.a*other.b + self.b*other.d
+        self.c = other.a*self.c + other.c*self.d
+        self.d = other.b*self.c + self.d*other.d
+        self.tx += self.a*other.tx + self.b*other.ty
+        self.ty += self.c*other.tx + self.d*other.ty
+        return self
+
+    def __matmul__(self, other):
+        trans = Transform(*self)
+        trans @= other
+        return trans
+
+    @classmethod
+    def identity(cls):
+        """The identity transform"""
+        return cls(1, 0, 0, 1, 0, 0)
