@@ -97,6 +97,7 @@
 <Playground>:
     sandbox: sandbox.__self__
     code_editor: code_editor
+    # code_editor_scrlv: code_editor_scrlv
     rpanel: rpanel
     textout: textout
 
@@ -141,6 +142,12 @@
                 BoxLayout:
                     orientation: 'vertical'
 
+                    # ScrollView:
+                    #     id: code_editor_scrlv
+                    #     bar_width: 10
+                    #     scroll_type: ['bars', 'content']
+                    #     size_hint: 0.2, 0.2
+                    #     bar_inactive_color: 0, .7, .3
                     CodeEditor:
                         id: code_editor
                         focus: True
@@ -148,11 +155,14 @@
                         text: root.code
                         on_text: root.code = args[1]
                         auto_indent: True
-                        background_color: 0.153, 0.157, 0.133, 1
+                        # background_color: 0.153, 0.157, 0.133, 1
                         cursor_width: '2sp'
-                        size_hint_y: 0.75
+                        # size_hint_y: 0.75
+                        size_hint: 1, 0.75
+                        # height: max(self.minimum_height, code_editor_scrlv.height)
                         cursor_color: (1, 1, 1, 1)
                         font_name: 'Fira Code'
+                        bold: False
 
                     # ToggleButton:
                     #     on_state: root.run_to_cursor = self.state=='down'
@@ -189,6 +199,7 @@
                             TextInput:
                                 id: watches_label
                                 font_name: 'Fira Code'
+                                foreground_color: [0, 0, 0, 0.999]
                                 readonly: True
                                 #text_size: self.size, None
                                 text_size: self.width, self.height

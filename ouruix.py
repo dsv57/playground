@@ -6,6 +6,7 @@ from random import random, randint, uniform, choice, seed
 from math import sin, cos, atan2, sqrt, ceil, floor, degrees, radians, log, pi, exp
 from copy import deepcopy
 from time import process_time, time
+from weakref import WeakValueDictionary
 from os.path import exists
 # from sys import exc_info
 import re
@@ -16,6 +17,7 @@ import ast
 # import jedi
 # from sys import getsizeof
 from collections import defaultdict, namedtuple
+from traceback import print_exc
 
 from kivy.uix.textinput import FL_IS_LINEBREAK
 
@@ -23,16 +25,20 @@ from kivy.uix.behaviors import FocusBehavior
 from kivy.uix.codeinput import CodeInput
 from kivy.uix.widget import Widget
 from kivy.uix.image import Image
+from kivy.uix.button import Button
 from kivy.uix.actionbar import ActionItem
 from kivy.uix.stencilview import StencilView
 from kivy.uix.scatter import ScatterPlane
 from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.boxlayout import BoxLayout
+from kivy.core.image import Image as CoreImage
 from kivy.graphics import Color, Line, Rectangle, Ellipse, Triangle, \
-        PushMatrix, PopMatrix, RoundedRectangle
+        PushMatrix, PopMatrix, RoundedRectangle, RenderContext, Mesh, \
+        ClearBuffers, ClearColor, Callback, BindTexture, Fbo, ClearBuffers, ClearColor
+from kivy.graphics.texture import Texture
 from kivy.graphics.transformation import Matrix
-from kivy.graphics.context_instructions import Rotate, Translate, Scale
+from kivy.graphics.context_instructions import Rotate, Translate, Scale, MatrixInstruction, Transform as KvTransform
 from kivy.properties import StringProperty, NumericProperty, \
         ListProperty, ObjectProperty, BooleanProperty, \
         OptionProperty, DictProperty
@@ -41,7 +47,9 @@ from kivy.cache import Cache
 from kivy.utils import escape_markup
 from kivy.core.text.markup import MarkupLabel
 from kivy.core.window import Window # request keyboard
-from kivy.graphics.opengl import glEnable
+from kivy.graphics.opengl import glEnable, glDisable, glFinish
+from kivy.resources import resource_find
+# from kivy.graphics.fbo import Fbo
 
 import pymunk
 
@@ -49,7 +57,9 @@ from ourturtle import Turtle
 from sprite import Sprite, OurImage, Vector
 from codean import autocomp, CodeRunner, Break, COMMON_CODE
 from sokoban.sokoban import Sokoban
-from playground.shapes import Stroke, Physics, Shape, Circle, Rectangle
+
+from playground.color import _srgb_to_linear, _parse_srgb, _global_update_colors, Color as OurColor
+from playground.shapes import Stroke, Physics, Shape, Circle, Rectangle, KeepRefs, Image as OurImage
 from playground.geometry import Vector, VectorRef, Transform
 
 try:
@@ -59,6 +69,7 @@ except:
 
 # https://github.com/kivy/kivy/wiki/Working-with-Python-threads-inside-a-Kivy-application
 
+GL_VERTEX_PROGRAM_POINT_SIZE = 34370
 GL_FRAMEBUFFER_SRGB_EXT = 36281
 
 F_UPDATE = 'update'
@@ -66,6 +77,100 @@ F_ON_KEY_PRESS = 'on_key_press'
 F_ON_KEY_RELEASE = 'on_key_release'
 
 R_TURN = re.compile(r'^(\s*)(right|left|up|down)\(([0-9]*)\)$')
+
+grace_hopper = Image(source='grace_hopper.jpg', mipmap=True, anim_delay=0.04166) #, keep_data=True)
+# print(grace_hopper, grace_hopper.texture, grace_hopper.texture.tex_coords, grace_hopper.texture.uvpos, grace_hopper.texture.uvsize)
+# grace_hopper.texture.blit_buffer(pbuffer=_srgba_bytes_to_linear(grace_hopper.texture.pixels), colorfmt='rgba')
+# print(grace_hopper.texture.pixels)
+# raise Exception
+# texture = Texture.create_from_data(grace_hopper.data)
+# print(texture, texture.)
+
+# def texture_to_linear_srgb(texture):
+
+#     fbo = Fbo(size=texture.size)
+#     fbo.shader.fs = '''
+#     $HEADER$
+
+#     vec3 to_linear(vec3 srgb){
+#         vec3 cutoff = vec3(lessThan(srgb, vec3(12.92 * 0.0031308)));
+#         vec3 higher = pow((srgb + 0.055) / 1.055, vec3(2.4));
+#         vec3 lower = srgb / vec3(12.92);
+#         return mix(higher, lower, cutoff);
+#     }
+
+#     void main (void) {
+#         vec4 srgb = texture2D(texture0, tex_coord0);
+#         gl_FragColor = vec4(1., 0., 0., 1.); //to_linear(srgb.rgb), srgb.w);
+#     }
+#     '''
+#     with fbo:
+#         Color(1, 1, 1)
+#         Rectangle(size=texture.size, texture=texture, tex_coords=texture.tex_coords)
+#     fbo.draw()
+
+#     return fbo.texture
+
+# def radial_gradient(border_color=(1, 1, 0), center_color=(1, 0, 0),
+#         size=(64, 64)):
+
+#     fbo = Fbo(size=size, clear_color=(.1, 1, .2, 1))
+#     fbo.shader.fs = '''
+#     $HEADER$
+#     uniform vec3 border_color;
+#     uniform vec3 center_color;
+#     void main (void) {
+#         float d = clamp(distance(tex_coord0, vec2(0.5, 0.5)), 0., 1.);
+#         gl_FragColor = vec4(1., 1., 0., 1.); //vec4(mix(center_color, border_color, d), 1);
+#     }
+#     '''
+
+#     # use the shader on the entire surface
+#     fbo['border_color'] = list(map(float, border_color))
+#     fbo['center_color'] = list(map(float, center_color))
+#     with fbo:
+#         ClearColor(1, 1, 1, 1)
+#         ClearBuffers()
+#         Color(1, 1, 0)
+#         Rectangle(size=size)
+#     fbo.draw()
+
+#     return fbo.texture
+
+
+# def create_tex(*args):
+#     center_color = 255, 255, 0
+#     border_color = 100, 0, 0
+
+#     size = (64, 64)
+#     tex = Texture.create(size=size)
+
+#     sx_2 = size[0] // 2
+#     sy_2 = size[1] // 2
+
+#     buf = bytearray()
+#     for x in range(-sx_2, sx_2):
+#         for y in range(-sy_2, sy_2):
+#             a = x / (1.0 * sx_2)
+#             b = y / (1.0 * sy_2)
+#             d = (a ** 2 + b ** 2) ** .5
+
+#             for c in (0, 1, 2):
+#                 buf += bytearray((max(0,
+#                                min(255,
+#                                    int(center_color[c] * (1 - d)) +
+#                                    int(border_color[c] * d))),))
+
+#     tex.blit_buffer(bytes(buf), colorfmt='rgb', bufferfmt='ubyte')
+#     return tex
+
+
+
+# grace_hopper.texture = texture_to_linear_srgb(grace_hopper.texture)
+# glFinish()
+# grad = radial_gradient()
+# glFinish()
+# print('GRAD', grad, grad.tex_coords)
 
 def whos(vars, max_repr=40):
     w_types = (int, float, str, list, dict, tuple)
@@ -89,9 +194,11 @@ class ActionStepSlider(BoxLayout, ActionItem):
     step = NumericProperty(0)
     max_step = NumericProperty(0)
 
+from pygments import styles
+from pygments.formatters import BBCodeFormatter
+
 class CodeEditor(CodeInput, FocusBehavior):
     def __init__(self, **kwargs):
-        # self._highlight_line = None
         self.hightlight_styles = {
             'error': (True, (.9, .1, .1, .4)),
             'run': (False, (.1, .9, .1, 1.0))
@@ -104,8 +211,25 @@ class CodeEditor(CodeInput, FocusBehavior):
         self.ac_position = None
         self.ac_completions = []
         self.register_event_type('on_key_down')
+
         super(CodeEditor, self).__init__(**kwargs)
 
+    # Kivy bug workaround
+    def get_cursor_from_xy(self, x, y):
+        # print('get_cursor_from_xy', x, y, type(x), type(y))
+        return super(CodeEditor, self).get_cursor_from_xy(int(x), y)
+
+    def on_style(self, *args):
+        self.formatter = BBCodeFormatter(style=self.style)
+        bg_color, alpha = _parse_srgb(self.formatter.style.background_color)
+        self.background_color = bg_color + (alpha or 1,)
+        self._trigger_update_graphics()
+
+    def on_style_name(self, *args):
+        self.style = styles.get_style_by_name(self.style_name)
+        bg_color, alpha = _parse_srgb(self.style.background_color)
+        self.background_color = bg_color + (alpha or 1,)
+        self._trigger_refresh_text()
 
 #    def _get_bbcode(self, ntext):
 #        print('_get_bbcode', ntext)
@@ -130,7 +254,7 @@ class CodeEditor(CodeInput, FocusBehavior):
             self._highlight[style].clear()
         self._trigger_update_graphics()
 
-    def _update_graphics(self, *largs):
+    def _update_graphics(self, *largs):  # FIXME: Not needed?
         super(CodeInput, self)._update_graphics(*largs)
         self._update_graphics_highlight()
 
@@ -264,7 +388,7 @@ class CodeEditor(CodeInput, FocusBehavior):
     def keyboard_on_key_down(self, window, keycode, text, modifiers):
         # print('keyboard_on_key_down', keycode, text, modifiers)
         key, key_str = keycode
-        print('kk', keycode, text, modifiers)
+        # print('kk', keycode, text, modifiers)
         if key == 9:  # Tab
             if modifiers == ['ctrl']:
                 if self.focus_next:
@@ -318,10 +442,10 @@ class CodeEditor(CodeInput, FocusBehavior):
                 else:
                     self.ac_completions = autocomp(self.text, self.namespace,
                                                    cr, cc)
-                    print(
-                        "ACS: ", '\n'.join(
-                            sorted(
-                                [ac.full_name for ac in self.ac_completions])))
+                    # print(
+                    #     "ACS: ", '\n'.join(
+                    #         sorted(
+                    #             [ac.full_name for ac in self.ac_completions])))
                     # print('= ' * 40)
                     # print('AC BEGIN', _lines[cr], self.text.splitlines()[cr], cr, cc, self.ac_completions)
                     if self.ac_completions:
@@ -381,8 +505,33 @@ class CodeEditor(CodeInput, FocusBehavior):
         return super(CodeInput, self).keyboard_on_key_down(
             window, keycode, text, modifiers)
 
+    def on_double_tap(self):
+        # last_identifier = re.compile(r'(\w+)(?!.*\w.*)')
+        ci = self.cursor_index()
+        cc = self.cursor_col
+        line = self._lines[self.cursor_row]
+        len_line = len(line)
+        # start = max(0, len(line[:cc]) - line[:cc].rfind(u' ') - 1)
+        # end = line[cc:].find(u' ')
+        # end = end if end > - 1 else (len_line - cc)
+        start = ci - cc
+        end = ci - cc + len(line)
+        words = [m.span() for m in re.finditer(r'\w+', line)]
+        if words:
+            s1, s2 = zip(*words)
+            nonwords = zip(s2, s1[1:])
+            for span in (*words, *nonwords): #words + list(nonwords):
+                if span[0] <= cc < span[1]:
+                    end = start + span[1]
+                    start += span[0]
+        Clock.schedule_once(lambda dt: self.select_text(start, end))
+
     def on_key_down(self, window, keycode, text, modifiers):
         pass
+
+    def on_cursor_row(self, *largs):
+        pass
+
 
 class Ball(Widget):
     def goto(self, x, y):
@@ -429,40 +578,194 @@ class VarSlider(GridLayout):
 
 class OurSandbox(FocusBehavior, ScatterPlane):
 
+    texture = ObjectProperty(None)
+
     def __init__(self, **kwargs):
+        # self.canvas = RenderContext()  # ?
+        self.canvas = RenderContext(use_parent_projection=True,
+                                    use_parent_modelview=True,
+                                    use_parent_frag_modelview=True)
+
+        with self.canvas.before:
+            self.cb = Callback(self.setup_gl_context)
+        # with self.canvas:
+        #     self.fbo = Fbo(size=self.size)
+        #     self.fbo_color = Color(1, 1, 1, 1)
+        #     self.fbo_rect = Rectangle()
+        with self.canvas.after:
+            self.cb = Callback(self.reset_gl_context)
+        # with self.fbo:
+        #     ClearColor(0, 0, 0, 0)
+        #     ClearBuffers()
+            # Color(.7, 0, .7, 1)
+            # Rectangle(pos=(0,0),size=(300,500))
+        # self.texture = self.fbo.texture
+        self.canvas.shader.fs = open(resource_find('srgb_to_linear.glsl')).read()
         super(OurSandbox, self).__init__(**kwargs)
-        # self.space = pymunk.Space()
-        # self.space.gravity = (0.0, -900.0)
-        # self.space.sleep_time_threshold = 0.3
+        # self.canvas.shader.source = resource_find('shader2.glsl')
+        self.rc1 = RenderContext(use_parent_modelview=True, use_parent_projection=True)
+        self.rc2 = RenderContext(use_parent_modelview=True, use_parent_projection=True)
+        self.rc1.shader.source = resource_find('shader1.glsl')
+        self.rc2.shader.source = resource_find('shader2.glsl')
+        self.rc1['texture1'] = 1
+        self.rc2['texture1'] = 1
+        # x, y, w, *stroke, *fill, a1, a2, *tr
+        self.rc1_vfmt = (
+            (b'center', 2, 'float'),
+            (b'width',  1, 'float'),
+            (b'stroke', 4, 'float'),
+            (b'fill',   4, 'float'),
+            (b'angle_start', 1, 'float'),
+            (b'angle_end',   1, 'float'),
+            (b'transform',   4, 'float'),
+            (b'size',        2, 'float'),
+            (b'tex_coords0', 2, 'float'),
+            (b'tex_coords1', 2, 'float'),
+        )
+        self.rc2_vfmt = (
+            (b'center', 2, 'float'),
+            (b'radius', 1, 'float'),
+            (b'width',  1, 'float'),
+            (b'stroke', 4, 'float'),
+            (b'fill',   4, 'float'),
+            (b'transform', 4, 'float'),
+            (b'size',      2, 'float'),
+            (b'tex_coords0', 2, 'float'),
+            (b'tex_coords1', 2, 'float'),
+        )
+        # with self.rc1:
+        #     self.mesh1 = self.make_ellipses()
+        # with self.rc2:
+        #     self.mesh2 = self.make_rects()
+
+        # self.add_widget(Button(text='Hello'))
+        # self.add_widget(Image(source='/home/user/pics/birthday-72.jpg'))
+        # self.add_widget(Image(source='grad1.png'))
+
+            # glDisable(GL_FRAMEBUFFER_SRGB_EXT)
+        # self.canvas.add(self.rc1)
+        # self.canvas.add(self.rc2)
+        self.images = dict() #WeakValueDictionary()
+
+        Clock.schedule_interval(self.update_shader, 1 / 60.)
+        glEnable(GL_VERTEX_PROGRAM_POINT_SIZE)
+
         self.register_event_type('on_key_down')
         self.register_event_type('on_key_up')
         self.space = None
 
-        # self._keyboard = None
+    def setup_gl_context(self, *args):
+        glEnable(GL_FRAMEBUFFER_SRGB_EXT)
 
-        # self._keyboard = Window.request_keyboard(
-        #     self._keyboard_closed, self, 'text')
-        # if self._keyboard.widget:
-        #     pass
-        # self._keyboard.bind(on_key_down=self.on_key_down, on_key_up=self.on_key_up)
-        # print(dir(ScatterPlane))
+    def reset_gl_context(self, *args):
+        glDisable(GL_FRAMEBUFFER_SRGB_EXT)
 
-    # def on_focus(self, instance, value, *largs):
-    #     print('Touch')
-    #     if not self._keyboard:
-    #         self._keyboard = Window.request_keyboard(
-    #             self._keyboard_closed, self, 'text')
-    #         if self._keyboard.widget:
-    #             pass
-    #     self._keyboard.bind(on_key_down=self.on_key_down, on_key_up=self.on_key_up)
+    def update_shader(self, *largs):
+        # self.canvas['projection_mat'] = Window.render_context['projection_mat']
+        for rc in [self.rc1, self.rc2, self.canvas]: #, self.fbo]: #
+            rc['modelview_mat'] = self.transform #Window.render_context['modelview_mat']
+            rc['resolution'] = list(map(float, self.size))
+            rc['time'] = Clock.get_boottime()
+            rc['scale'] = self.transform[0]
+            rc['texture1'] = 1
+        self.canvas.ask_update()
+
+    # def add_widget(self, *largs):
+    #     # trick to attach graphics instruction to fbo instead of canvas
+    #     canvas = self.canvas
+    #     self.canvas = self.fbo
+    #     ret = super(OurSandbox, self).add_widget(*largs)
+    #     self.canvas = canvas
+    #     return ret
+
+    # def remove_widget(self, *largs):
+    #     canvas = self.canvas
+    #     self.canvas = self.fbo
+    #     super(OurSandbox, self).remove_widget(*largs)
+    #     self.canvas = canvas
+
+    # def on_size(self, instance, value):
+    #     self.fbo.size = value
+    #     self.texture = self.fbo.texture
+    #     self.fbo_rect.size = value
+
+    # def on_pos(self, instance, value):
+    #     self.fbo_rect.pos = value
+
+    # def on_texture(self, instance, value):
+    #     self.fbo_rect.texture = value
+
+    # def on_alpha(self, instance, value):
+    #     self.fbo_color.rgba = (1, 1, 1, value)
+
+    def make_ellipses(self):
+        step = 10
+        istep = (pi * 2) / float(step)
+        meshes = []
+        # indices = [0, 1, 3, 2]
+        indices = [0, 3, 1, 2]
+        tr = 1, 0, 0, 1
+        tex_coords = grace_hopper.texture.tex_coords
+        for i in range(600):
+            # x = 100 + cos(istep * i) * 100
+            # y = 100 + sin(istep * i) * 100
+            x = randint(0, 2000)
+            y = randint(0, 2000)
+            a = randint(10, 100)
+            b = randint(10, 100)
+            w = randint(0, min(a, b) // 2)
+            stroke = *OurColor(random()*30 + 40, 50, random()*360, mode='Jsh').linear_srgb, random() # random(), random(), random(), random()
+            fill = *OurColor(random()*30 + 40, 50, random()*360, mode='Jsh').linear_srgb, random() # # random(), random(), random(), random()
+            a1 = 2 * pi * random()
+            a2 = 2 * pi * random()
+            v0 = x, y, +a, -b, w, *stroke, *fill, a1, a2, *tr, *tex_coords[0:2]
+            v1 = x, y, -a, -b, w, *stroke, *fill, a1, a2, *tr, *tex_coords[2:4]
+            v2 = x, y, -a, +b, w, *stroke, *fill, a1, a2, *tr, *tex_coords[4:6]
+            v3 = x, y, +a, +b, w, *stroke, *fill, a1, a2, *tr, *tex_coords[6:8]
+            vertices = v0 + v1 + v2 + v3
+            meshes.append(Mesh(fmt=self.rc1_vfmt, mode='triangle_strip', vertices=vertices, indices=indices, texture=grace_hopper.texture))
+        return meshes
+
+    def make_rects(self):
+        step = 10
+        istep = (pi * 2) / float(step)
+        meshes = []
+        indices = [0, 1, 3, 2]
+        tr = 1, 0, 0, 1
+        for i in range(900):
+            # x = 100 + cos(istep * i) * 100
+            # y = 100 + sin(istep * i) * 100
+            x = randint(0, 2000)
+            y = randint(0, 2000)
+            a = randint(10, 100)
+            b = randint(10, 100)
+            w = randint(0, min(a, b) // 2)
+            r = randint(0, min(a, b) // 2)
+            stroke = *OurColor(random()*30 + 40, 50, random()*360, mode='Jsh').linear_srgb, random() # random(), random(), random(), random()
+            fill = *OurColor(random()*30 + 40, 50, random()*360, mode='Jsh').linear_srgb, random() # # random(), random(), random(), random()
+            v0 = x, y, -a, -b, r, w, *stroke, *fill, *tr
+            v1 = x, y, -a, +b, r, w, *stroke, *fill, *tr
+            v2 = x, y, +a, +b, r, w, *stroke, *fill, *tr
+            v3 = x, y, +a, -b, r, w, *stroke, *fill, *tr
+            vertices = v0 + v1 + v2 + v3
+            meshes.append(Mesh(fmt=self.rc2_vfmt, mode='triangle_strip', vertices=vertices, indices=indices))
+        return meshes
 
     def keyboard_on_key_down(self, window, keycode, text, modifiers):
         '''We call super before doing anything else to enable tab cycling
         by FocusBehavior. If we wanted to use tab for ourselves, we could just
         not call it, or call it if we didn't need tab.
         '''
-        print('DOWN', keycode, text, modifiers)
-        if self.dispatch('on_key_down', window, keycode, text, modifiers):
+        print('DOWN', keycode, text, modifiers, '\n', self.transform)
+
+        if keycode[1] == 'f2':
+            self.rc1.shader.source = resource_find('shader1.glsl')
+            self.rc2.shader.source = resource_find('shader2.glsl')
+            self.canvas.shader.fs = open(resource_find('srgb_to_linear.glsl')).read()
+            print('projection_mat\n', self.canvas['projection_mat'])
+            print('modelview_mat\n', self.canvas['modelview_mat'])
+            print('frag_modelview_mat\n', self.canvas['frag_modelview_mat'])
+        elif self.dispatch('on_key_down', window, keycode, text, modifiers):
             return True
         return super(OurSandbox, self).keyboard_on_key_down(
             window, keycode, text, modifiers)
@@ -599,6 +902,7 @@ def update(dt):
 
     sandbox = ObjectProperty(None)
     code_editor = ObjectProperty(None)
+    code_editor_scrlv = ObjectProperty(None)
     rpanel = ObjectProperty(None)
     textout = ObjectProperty(None)
     run_to_cursor = BooleanProperty(False)
@@ -606,9 +910,14 @@ def update(dt):
     # ball = ObjectProperty(None)
 
     def __init__(self, **kwargs):
+        # self.canvas = RenderContext(use_parent_projection=True,
+        #                             use_parent_modelview=True,
+        #                             use_parent_frag_modelview=True)
+        # self.canvas.shader.fs = open(resource_find('srgb_to_linear.glsl')).read()
         super(Playground, self).__init__(**kwargs)
-        with self.canvas.before:
-            glEnable(GL_FRAMEBUFFER_SRGB_EXT)
+        # with self.canvas.before:
+        #     glEnable(GL_FRAMEBUFFER_SRGB_EXT)
+        # glEnable(GL_FRAMEBUFFER_SRGB_EXT)
 
         self._run_vars = None
         self._last_update_time = None
@@ -643,6 +952,7 @@ def update(dt):
         def _add_sprite(*largs, **kvargs):
             sp = Sprite(*largs, **kvargs)
             self.sandbox.add_widget(sp)
+            # self.sandbox.add_widget(Button(text='Abc'))
             return sp
         globs['add_sprite'] = _add_sprite
 
@@ -653,15 +963,15 @@ def update(dt):
             return line
         globs['Line'] = _add_line
 
-        self.sokoban = Sokoban()
-        def sokoban_go(dx, dy):
-            def go(step=1):
-                self.sokoban.move_player(dx, dy, step)
-            return go
-        globs['right'] = sokoban_go(1, 0)
-        globs['left'] = sokoban_go(-1, 0)
-        globs['up'] = sokoban_go(0, 1)
-        globs['down'] = sokoban_go(0, -1)
+        # self.sokoban = Sokoban()
+        # def sokoban_go(dx, dy):
+        #     def go(step=1):
+        #         self.sokoban.move_player(dx, dy, step)
+        #     return go
+        # globs['right'] = sokoban_go(1, 0)
+        # globs['left'] = sokoban_go(-1, 0)
+        # globs['up'] = sokoban_go(0, 1)
+        # globs['down'] = sokoban_go(0, -1)
 
         # self._segments = []
         # def _add_segment(point_a, point_b, radius=0.4, color='khaki'):
@@ -673,6 +983,11 @@ def update(dt):
                 g = (0, g)
             self._gravity = Vector(g)
         globs['set_gravity'] = _set_gravity
+
+        self._show_clipped = True
+        def _show_clipped_colors(show=True):
+            self._show_clipped = show
+        globs['show_clipped_colors'] = _show_clipped_colors
 
         self.trigger_exec_update = Clock.create_trigger(self.execute_update, -1)
         self.update_schedule = None
@@ -724,7 +1039,7 @@ def update(dt):
         # vs4.bind(value=_set_var)
         # vs5.bind(value=_set_var)
         # vs6.bind(value=_set_var)
-        # vs1.value = 1.2
+        vs1.value = 36.
         # vs2.value = 3.4
         # vs3.value = 4.2
         # vs4.value = 15
@@ -736,6 +1051,19 @@ def update(dt):
         self.graphics_instructions = []
         # self.bind(run_code=self.compile_run)
         # self.compile_run()
+
+    def code_editor_change_scroll_y(self):
+        ti = self.code_editor
+        scrlv = self.code_editor_scrlv
+        y_cursor = ti.cursor_pos[1]
+        y_bar = scrlv.scroll_y * (ti.height-scrlv.height)
+        if ti.height > scrlv.height:
+            if y_cursor >= y_bar + scrlv.height:
+                dy = y_cursor - (y_bar + scrlv.height)
+                scrlv.scroll_y = scrlv.scroll_y + scrlv.convert_distance_to_scroll(0, dy)[1]
+            if y_cursor - ti.line_height <= y_bar:
+                dy = (y_cursor - ti.line_height) - y_bar
+                scrlv.scroll_y = scrlv.scroll_y + scrlv.convert_distance_to_scroll(0, dy)[1]
 
     def code_editor_on_key_down(self, widget, window, keycode, text, modifiers):
         print('code_editor_on_key_down', keycode, text, modifiers)
@@ -763,12 +1091,14 @@ def update(dt):
             Key(keycode=keycode[0], key=keycode[1], text=None), None))
 
     def on_replay_step(self, *largs):
-        if self.sokoban:
-            code_lines = self.sokoban.replay(self.replay_step)
-            self.update_sandbox()
-            self.code_editor.highlight_line(code_lines, 'run')
+        pass
+        # if self.sokoban:
+        #     code_lines = self.sokoban.replay(self.replay_step)
+        #     self.update_sandbox()
+        #     self.code_editor.highlight_line(code_lines, 'run')
 
     def on_code_editor_cursor_row(self, *largs):
+        # self.code_editor_change_scroll_y()
         if self.run_to_cursor:
             self.compile_code()
 
@@ -779,7 +1109,7 @@ def update(dt):
             exc_name = exc.__class__.__name__ if exc else "Unknown Error"
             self.status_text = f'[b][color=f92672]{exc_name}[/color]: [/b]'
             if isinstance(exc, SyntaxError):
-                code = exc.text.replace('\n', '⏎')  #.replace('\t', ' ' * 4).replace(' ', '˽')
+                code = (exc.text or self.code.splitlines()[exc.lineno - 1]).replace('\n', '⏎')  #.replace('\t', ' ' * 4).replace(' ', '˽')
                 pos = exc.offset - 1
                 code_before = escape_markup(code[:pos].lstrip())
                 code_hl  = escape_markup(code[pos].replace(' ', '_'))
@@ -801,96 +1131,288 @@ def update(dt):
             pass
 
     def update_sandbox(self, redraw=True):
+        indices = [0, 3, 1, 2] #[0,3,1,2] #[0, 1, 3, 2]
+        # [u, v, u + w, v, u + w, v + h, u, v + h]
+        tex_coords_fill = tex_coords_stroke = 0.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0
+        def update_texture(image, texture):
+            # print("Hi!", self.sandbox.images, image.source)
+            for mesh in self.sandbox.image_meshes[image.source]:
+                mesh.texture = texture
         try:
+            t1 = process_time()
+            _global_update_colors()
+            t2 = process_time()
             if redraw:
-                self.graphics_instructions = []
-                # self.sandbox.canvas.clear()
+                self.sandbox.shapes = dict()
+                self.sandbox.images = defaultdict(list)
+                self.sandbox.image_meshes = defaultdict(list)
+            # with :
+                # if redraw:
+                #     self.ellipses = self.sandbox.make_ellipses()
+            for shape in Shape.get_instances(True):
+                # textured = shape.fill is not None and isinstance(shape.fill, OurImage)
+                # if textured and not redraw and id(shape) in self.sandbox.shapes and \
+                #         shape.fill.source in self.sandbox.images:
+                #     image = self.sandbox.images[shape.fill.source]
+                #     if image.anim_available:
+                #         print('Update texture!')
+                #         self.sandbox.shapes[id(shape)][0].texture = image.texture
+                if not redraw and not shape._is_modified and \
+                        id(shape) not in self.sandbox.shapes:
+                    continue
 
-                # self.sokoban.draw_level(self.sandbox)  # FIXME
+                w = 0
+                stroke = 0, 0, 0, 0
+                fill = 0, 0, 0, 0
+                image_fill = None
+                image_stroke = None
+                texture_fill = None
+                texture_stroke = None
+                if shape.stroke is not None and shape.stroke.fill is not None:
+                    if isinstance(shape.stroke.fill, OurImage):
+                        stroke = 1, 1, 1, 1
+                        source = shape.stroke.fill.source
+                        image_stroke = self.sandbox.images.get(source)
+                        if not image_stroke:
+                            image_stroke = Image(
+                                source=source,
+                                anim_delay=shape.stroke.fill.anim_delay)
+                            self.sandbox.images[source] = image_stroke
+                            # self.sandbox.images[shape.fill.source] = image
+                            # image.bind(texture=update_texture) # TODO: Animation
+                        texture_stroke = image_stroke.texture
+                        tex_coords_stroke = texture_stroke.tex_coords
+                    else:
+                        stroke = shape.stroke.fill.linear_srgba
+                    # if not self._show_clipped and shape.stroke.fill.is_clipped:
+                    #     continue
+                    w = shape.stroke.width
+                if shape.fill is not None:
+                    if isinstance(shape.fill, OurImage):
+                        fill = 1, 1, 1, 1
+                        source = shape.fill.source
+                        image_fill = self.sandbox.images.get(source)
+                        if not image_fill: #shape.fill.source not in self.sandbox.images:
+                            image_fill = Image(
+                                source=source,
+                                anim_delay=shape.fill.anim_delay)
+                            self.sandbox.images[source] = image_fill
+                            # self.sandbox.images[shape.fill.source] = image
+                            image_fill.bind(texture=update_texture)
+                        texture_fill = image_fill.texture
+                        tex_coords_fill = texture_fill.tex_coords
+                    else:
+                        # if not self._show_clipped and shape.fill.is_clipped:
+                        #     continue
+                        fill = shape.fill.linear_srgba
+                if shape.opacity != 100.0:
+                    stroke = *stroke[:3], stroke[3] * shape.opacity / 100
+                    fill = *fill[:3], fill[3] * shape.opacity / 100
+                # if shape.fill and shape.fill.is_clipped:
+                #     print('Clipped!')
+                tr = 1, 0, 0, 1
+                if shape.transform:
+                    tr = tuple(shape.transform)
+                    x += tr[4]
+                    y += tr[5]
+                    tr = tr[:4]
 
-                with self.sandbox.canvas:
-                    Color(0.3, 0, 0)
-                    Ellipse(pos=(100, 100), size=(200, 200))
-                    Color(0.0732, 0, 0)
-                    Ellipse(pos=(300, 100), size=(200, 200))
+                if isinstance(shape, Circle):
+                    x, y = shape.center
+                    a = b = shape.radius * 2
+                    a1 = radians(shape.angle_start)
+                    a2 = radians(shape.angle_end)
+                    v_attrs = x, y, w, *stroke, *fill, a1, a2, *tr
+                    v0 = *v_attrs, +a, -b, *tex_coords_fill[0:2], *tex_coords_stroke[0:2]
+                    v1 = *v_attrs, -a, -b, *tex_coords_fill[2:4], *tex_coords_stroke[2:4]
+                    v2 = *v_attrs, -a, +b, *tex_coords_fill[4:6], *tex_coords_stroke[4:6]
+                    v3 = *v_attrs, +a, +b, *tex_coords_fill[6:8], *tex_coords_stroke[6:8]
+                    vertices = v0 + v1 + v2 + v3
+                    if redraw or id(shape) not in self.sandbox.shapes:
+                        with self.sandbox.rc1:
+                            BindTexture(texture=texture_stroke, index=1)
+                            mesh = Mesh(fmt=self.sandbox.rc1_vfmt, mode='triangle_strip', vertices=vertices, indices=indices, texture=texture_fill) #, texture=grace_hopper.texture) #, source='grace_hopper.jpg')
+                        self.sandbox.shapes[id(shape)] = [mesh]
+                        if image_fill is not None:
+                            self.sandbox.image_meshes[image_fill.source].append(mesh)
+                        # if image_stroke is not None:
+                        #     self.sandbox.image_meshes[image_stroke.source].append(mesh)
+                        # if image is not None:
+                        #     def update_texture(*largs):
+                        #         mesh.texture = image.texture
+                        #     image.bind(texture=update_texture)
+                    else:
+                        self.sandbox.shapes[id(shape)][0].vertices = vertices
+                        # if self.sandbox.shapes[id(shape)][0].texture is not None:
+                            # self.sandbox.shapes[id(shape)][0].texture = image.texture
+                elif isinstance(shape, Rectangle):
+                    x, y = shape.corner
+                    a, b = shape.size
+                    r = shape.radius
+                    v_attrs = x, y, r, w, *stroke, *fill, *tr
+                    v0 = *v_attrs, +a, -b, *tex_coords_fill[0:2], *tex_coords_stroke[0:2]
+                    v1 = *v_attrs, -a, -b, *tex_coords_fill[2:4], *tex_coords_stroke[2:4]
+                    v2 = *v_attrs, -a, +b, *tex_coords_fill[4:6], *tex_coords_stroke[4:6]
+                    v3 = *v_attrs, +a, +b, *tex_coords_fill[6:8], *tex_coords_stroke[6:8]
+                    vertices = v0 + v1 + v2 + v3
+                    # print('v0', v0)
+                    if redraw or id(shape) not in self.sandbox.shapes:
+                        # print('Rect TEX:', texture, tex_coords)
+                        with self.sandbox.rc2:
+                            BindTexture(texture=texture_stroke, index=1)
+                            mesh = Mesh(fmt=self.sandbox.rc2_vfmt, mode='triangle_strip', vertices=vertices, indices=indices, texture=texture_fill)#, source='grace_hopper.jpg')
+                        self.sandbox.shapes[id(shape)] = [mesh]
+                        if image_fill is not None:
+                            self.sandbox.image_meshes[image_fill.source].append(mesh)
+                        # if image is not None: # and redraw:
+                            # self.sandbox.images[image.source].append(mesh)
+                            # image.bind(texture=update_texture)
+                    else:
+                        self.sandbox.shapes[id(shape)][0].vertices = vertices
+                        # self.sandbox.shapes[id(shape)][0].texture=grace_hopper.texture
+                else:
+                    raise NotImplementedError
 
-                    for t in Turtle.turtles():
-                        for color, width, points in t._lines:
-                            # if self.run_to_cursor:
-                            # color = *color[:3], 0.5
-                            # igroup = InstructionGroup()
-                            ci = Color(*color)
-                            li = Line(
-                                points=points,
-                                width=width,
-                                joint='round',
-                                cap='round')
-                            self.graphics_instructions.append((deepcopy(
-                                (color, width, points)), ci, li))
-                        for shape, pos, size, color in t._stamps:
-                            # if self.run_to_cursor:
-                            # color = *color[:3], 0.5
-                            with self.sandbox.canvas:
-                                Color(0.3, 0, 0)
-                                Ellipse(pos=(100, 100), size=(200, 200))
-                                Color(0.0732, 0, 0)
-                                Ellipse(pos=(300, 100), size=(200, 200))
 
-                                Color(*color)
-                                if shape == 'Ellipse':
-                                    Ellipse(
-                                        pos=pos - 0.5 * Vector(size[0], size[1]),
-                                        size=(size[0], size[1]))
-                                elif shape == 'Rectangle':
-                                    Rectangle(
-                                        pos=pos - 0.5 * Vector(size[0], size[1]),
-                                        size=(size[0], size[1]))
+            t3 = process_time()
 
-                        PushMatrix()
-                        size = t._shapesize
-                        Translate(*t._position)
-                        Scale(size)
-                        Rotate(angle=t.heading(), axis=(0, 0, 1), origin=(0, 0))
-                        Color(*t._pencolor)
-                        # Triangle(points=[0, -10, 30, 0, 0, 10])  # FIXME
-                        PopMatrix()
-                    # for s in Sprite._instances:
-                    #     s.draw()
-                        # self.sandbox.add_widget(s)
-            else:
-                i = 0
-                instrs = len(self.graphics_instructions)
-                # st_ch = 0
-                # st_n = 0
-                with self.sandbox.canvas:
-                    for t in Turtle.turtles():
-                        for color, width, points in t._lines:
-                            if i < instrs:
-                                line, ci, li = self.graphics_instructions[i]
-                                # print(line)
-                                if line != (color, width, points):
-                                    # print("CHANGE", points, li.points)
-                                    li.points = points
-                                    self.graphics_instructions[i] = (deepcopy(
-                                        (color, width, points)), ci, li)
-                                    # st_ch += 1
-                            else:
-                                # st_n += 1
-                                ci = Color(*color)
-                                li = Line(
-                                    points=points,
-                                    width=width,
-                                    joint='round',
-                                    cap='round')
-                                self.graphics_instructions.append((deepcopy(
-                                    (color, width, points)), ci, li))
-                            i += 1
-                # print("STATS:", instrs, st_ch, st_n)
+            # print('T1-2', t2-t1)
+            # print('T2-3', t3-t2)
+            # print('T', t3-t1)
         except Exception as e:
-            print('update_sandbox:', e)
+            print('E at update_sandbox:')
+            print_exc()
+
+        # try:
+        #     if redraw:
+        #         self.graphics_instructions = []
+        #         # self.sokoban.draw_level(self.sandbox)  # FIXME
+        #         with self.sandbox.canvas:
+        #             pass
+        #             # Color(0.3, 0, 0)
+        #             # Ellipse(pos=(100, 100), size=(200, 200))
+        #             # Color(0.0732, 0, 0)
+        #             # Ellipse(pos=(300, 100), size=(200, 200))
+
+        #             # self.mesh = self.sandbox.build_mesh()
+
+
+        #             for shape in Circle.get_instances():
+        #                 stroke = shape.stroke
+        #                 fill = shape.fill
+        #                 trans = shape.transform
+        #                 if trans:
+        #                     PushMatrix()
+        #                     # print('trans', fill, stroke, type(trans), trans, 111, shape.transform)
+        #                     a, b, c, d, tx, ty = trans
+        #                     mat = Matrix()  # .translate(500, 200, 0)
+        #                     mat.set(array=[
+        #                         [a, b, 0, 0],
+        #                         [c, d, 0, 0],
+        #                         [0, 0, 1, 0],
+        #                         [tx, ty, 0, 1]])
+        #                     # print('MATRIX', mat) # Matrix().rotate(radians(30),0,0,1))
+        #                     KvTransform().transform(mat)
+        #                     # Translate(0, 250, 0)
+        #                 cx, cy = shape.center
+        #                 r = shape.radius
+        #                 pos = cx - r, cy - r
+        #                 size = 2*r, 2*r
+        #                 if fill:
+        #                     Color(*fill.srgb)
+        #                     Ellipse(pos=Vector(pos) - (0,0), size=size)
+        #                 if stroke and stroke.fill:
+        #                     Color(*stroke.fill.srgb)
+        #                     dashes = dict(
+        #                         dash_length=stroke.dashes[0],
+        #                         dash_offset=stroke.dashes[1]
+        #                     ) if stroke.dashes else {}
+        #                     print('dashes', dashes)
+        #                     line = Line(
+        #                         ellipse=(*pos, *size),
+        #                         width=stroke.width,
+        #                         cap=stroke.cap,
+        #                         joint=stroke.joint, **dashes)
+        #                 if trans:
+        #                     PopMatrix()
+
+        #             for t in Turtle.turtles():
+        #                 for color, width, points in t._lines:
+        #                     # if self.run_to_cursor:
+        #                     # color = *color[:3], 0.5
+        #                     # igroup = InstructionGroup()
+        #                     ci = Color(*color)
+        #                     li = Line(
+        #                         points=points,
+        #                         width=width,
+        #                         joint='round',
+        #                         cap='round')
+        #                     self.graphics_instructions.append((deepcopy(
+        #                         (color, width, points)), ci, li))
+        #                 for shape, pos, size, color in t._stamps:
+        #                     # if self.run_to_cursor:
+        #                     # color = *color[:3], 0.5
+        #                     with self.sandbox.canvas:
+        #                         # Color(0.3, 0, 0)
+        #                         # Ellipse(pos=(100, 100), size=(200, 200))
+        #                         # Color(0.0732, 0, 0)
+        #                         # Ellipse(pos=(300, 100), size=(200, 200))
+
+        #                         Color(*color)
+        #                         if shape == 'Ellipse':
+        #                             Ellipse(
+        #                                 pos=pos - 0.5 * Vector(size[0], size[1]),
+        #                                 size=(size[0], size[1]))
+        #                         elif shape == 'Rectangle':
+        #                             Rectangle(
+        #                                 pos=pos - 0.5 * Vector(size[0], size[1]),
+        #                                 size=(size[0], size[1]))
+
+        #                 # PushMatrix()
+        #                 # size = t._shapesize
+        #                 # Translate(*t._position)
+        #                 # Scale(size)
+        #                 # Rotate(angle=t.heading(), axis=(0, 0, 1), origin=(0, 0))
+        #                 # Color(*t._pencolor)
+        #                 # Triangle(points=[0, -10, 30, 0, 0, 10])  # FIXME
+        #                 # PopMatrix()
+        #             # for s in Sprite._instances:
+        #             #     s.draw()
+        #                 # self.sandbox.add_widget(s)
+        #     else:
+        #         i = 0
+        #         instrs = len(self.graphics_instructions)
+        #         # st_ch = 0
+        #         # st_n = 0
+        #         with self.sandbox.canvas:
+        #             for t in Turtle.turtles():
+        #                 for color, width, points in t._lines:
+        #                     if i < instrs:
+        #                         line, ci, li = self.graphics_instructions[i]
+        #                         # print(line)
+        #                         if line != (color, width, points):
+        #                             # print("CHANGE", points, li.points)
+        #                             li.points = points
+        #                             self.graphics_instructions[i] = (deepcopy(
+        #                                 (color, width, points)), ci, li)
+        #                             # st_ch += 1
+        #                     else:
+        #                         # st_n += 1
+        #                         ci = Color(*color)
+        #                         li = Line(
+        #                             points=points,
+        #                             width=width,
+        #                             joint='round',
+        #                             cap='round')
+        #                         self.graphics_instructions.append((deepcopy(
+        #                             (color, width, points)), ci, li))
+        #                     i += 1
+        #         # print("STATS:", instrs, st_ch, st_n)
+        # except KeyError as e:
+        #     print('update_sandbox:', e)
 
     def compile_code(self, *largs):
-        if self.update_schedule:
+        if self.update_schedule is not None:
             self.update_schedule.cancel()
         breakpoint = None
         if self.run_to_cursor:
@@ -925,8 +1447,10 @@ def update(dt):
                 changed.remove(COMMON_CODE)
             print('EXEC Changed:', changed)
             try:
-                if self.runner.execute(changed) and F_UPDATE in self.runner.globals and not self.update_schedule.is_triggered:
-                    self.update_schedule.cancel()
+                if self.runner.execute(changed) and F_UPDATE in self.runner.globals \
+                        and not (self.update_schedule and self.update_schedule.is_triggered):
+                    if self.update_schedule is not None:
+                        self.update_schedule.cancel()
                     self.update_schedule()
             except Exception as e:
                 print('E3:', e)
@@ -935,6 +1459,8 @@ def update(dt):
     def execute_code(self, *largs):
         print('execute_code')
         self.status = ('EXEC',)
+        self._gravity = Vector(0, 0)
+        self._show_clipped = True
         self.runner.reset(globals=self.vars)
         self.prev_step = max(self.step, self.prev_step)
         self.step = 0
@@ -943,18 +1469,21 @@ def update(dt):
         self._segments = []
         # Sprite.clear_sprites()  # FIXME
 
-        turtle = Turtle()  # self.sandbox.add_turtle()
+        turtle = Turtle()
         self._the_turtle = turtle
-        self.sokoban.load_level()
+        # self.sokoban.load_level()
         # for v in dir(turtle):  # FIXME
         #     if v[0] != '_':
         #         self.runner.globals[v] = getattr(turtle, v)
 
+        KeepRefs._clear_instances()
 
         # Clear the Right Way (Thank you Mark Vasilkov)
-        # saved = self.sandbox.children[:]
+        saved = self.sandbox.children[:]
         self.sandbox.clear_widgets()
         self.sandbox.canvas.clear()
+        self.sandbox.rc1.clear()
+        self.sandbox.rc2.clear()
         Sprite.clear_sprites()
         if self.sandbox.space:
             self.sandbox.space.remove(*self.sandbox.space.shapes, *self.sandbox.space.bodies)
@@ -962,8 +1491,14 @@ def update(dt):
         self.sandbox.space.gravity = self._gravity
         self.sandbox.space.sleep_time_threshold = 3.0
         self.sandbox.space.replay_mode = False
-        # for widget in saved:
-            # self.sandbox.add_widget(widget)
+        for widget in saved:
+            print('SAVED:', widget)
+            self.sandbox.add_widget(widget)
+        self.sandbox.canvas.add(self.sandbox.rc1)
+        self.sandbox.canvas.add(self.sandbox.rc2)
+        # self.sandbox.fbo.add(self.sandbox.rc1)
+        # self.sandbox.fbo.add(self.sandbox.rc2)
+
         # self.sandbox.add_widget(Sprite('sokoban/images/player.png', x=0, y=250, body_type=0))
         # self.sandbox.add_widget(Sprite('turtle', x=-50, y=50, body_type=0))
         # self.sandbox.add_widget(Sprite('circle', x=0, y=0, body_type=0))
@@ -985,16 +1520,19 @@ def update(dt):
 
         seed(123)
         ok = False
+        start = process_time()
         try:
             ok = self.runner.execute()
         except Exception as e:
-            print('E2:', e)
+            print('E2:')
+            print_exc()
+        print('Exec Time:', process_time() - start)
 
         watches = ''
         for v, t, r in whos(self.runner.globals):
-            watches += f'{v}\t{t}\t{r}\n'
+            watches += f'{v + " " * (8 - len(v))} {t + " " * (5 - len(t))}  {r}\n'
 
-        if ok and F_UPDATE in self.runner.globals and self.prev_step > 0:
+        if False: # ok and F_UPDATE in self.runner.globals and self.prev_step > 0:
             # print('Replay:', prev_step)
             t_start = time()
             self._last_update_time = time() - self.prev_step * 1/30
@@ -1011,9 +1549,9 @@ def update(dt):
 
         # FIXME: add scene spdiff
         self.update_sandbox()
-        if self.sokoban:
-            self.replay_step = len(self.sokoban.log)
-            self.replay_steps = len(self.sokoban.log)
+        # if self.sokoban:
+        #     self.replay_step = len(self.sokoban.log)
+        #     self.replay_steps = len(self.sokoban.log)
 
         # self.code_editor.highlight_line(None)
         if not ok:
@@ -1039,14 +1577,14 @@ def update(dt):
                 self.code_editor.highlight_line(None, 'run')
                 # self.code_editor.highlight_line(self.runner.breakpoint, 'run')
                 for filename, lineno, name, line, locals in traceback:
-                    print('TRACE:', filename, lineno, name, repr(line), repr(locals)[:80]) # filename, lineno, name, line, locals)
-                    if filename == '<code-input>':
-                        if name != '<module>':
-                            watched_locals = whos(locals)
-                            if watched_locals:
-                                watches += f'== {name} ==\n'
-                                for v, t, r in watched_locals:
-                                    watches += f'{v}\t{t}\t{r}\n'
+                    print('TRACE:', filename, lineno, name, repr(line), repr(locals)[:800]) # filename, lineno, name, line, locals)
+                    # if filename == '<code-input>':
+                    #     if name != '<module>':
+                    watched_locals = whos(locals)
+                    if watched_locals:
+                        watches += f'== {name} ==\n'
+                        for v, t, r in watched_locals:
+                            watches += f'{v}\t{t}\t{r}\n'
                         self.code_editor.highlight_line(lineno, hl_style, add=True)
                         # print('LINES +', lineno, self.code_editor._highlight)
 
@@ -1059,12 +1597,10 @@ def update(dt):
         else:
             self.status = ('COMPLETE',)
             self.code_editor.highlight_line(None)
-            # player_pos = [-x * 36 for x in self.sokoban._player_pos]
-            if self.sokoban and self.sokoban.boxes_remaining == 0:
-                print('Level completed:', self.sokoban.level)
-                self.sokoban.level += 1
-                self.sandbox.clear_widgets()
-                # self.sokoban.draw_level(self.sandbox)
+            # if self.sokoban and self.sokoban.boxes_remaining == 0:
+            #     print('Level completed:', self.sokoban.level)
+            #     self.sokoban.level += 1
+            #     self.sandbox.clear_widgets()
             if F_UPDATE in self.runner.globals:  # and (not self.update_schedule or not self.update_schedule.is_triggered):
                 self._last_update_time = time()
                 if self.update_schedule:
@@ -1107,7 +1643,9 @@ def update(dt):
             self.runner.call(F_UPDATE, dt)
 
         except Exception as e:
-            self.update_schedule.cancel()
+            print_exc()
+            if self.update_schedule:
+                self.update_schedule.cancel()
             watches = ''
             for v, t, r in whos(self.runner.globals):
                 watches += f'{v}\t{t}\t{r}\n'
@@ -1120,7 +1658,7 @@ def update(dt):
                 else:
                     exc_str = str(e) or e.__class__.__name__
                 traceback = self.runner._trace(e.__traceback__)
-            print('EXC:', exc_str)
+            print('EXC2:', exc_str)
             is_break = isinstance(exc, Break)
             if is_break:
                 self.status = ('BREAK', exc)

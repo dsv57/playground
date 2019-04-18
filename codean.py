@@ -20,10 +20,14 @@ jedi.preload_module('ourturtle')
 from astor import dump_tree, to_source
 
 def autocomp(src, namespace, lineno, column):
-    return jedi.Interpreter(
-        'from ourturtle import Turtle\n' + src, [namespace],
-        line=lineno + 1 + 1,
-        column=column).completions()
+    try:
+        completions = jedi.Interpreter(
+            'from ourturtle import Turtle\n' + src, [namespace],
+            line=lineno + 1 + 1,
+            column=column).completions()
+        return completions
+    except:
+        return []
 
 COMMON_CODE='<common>'
 
@@ -253,7 +257,7 @@ class CodeRunner:
             if depth > TRACE_MAX_DEPTH:
                 break
             # print('depth', depth, filename, lineno)
-            print('_trace1', name, filename == self._name, filename, lineno, repr(locals)[:120])
+            # print('_trace1', name, filename == self._name, filename, lineno, repr(locals)[:500])
             if filename == self._name:
                 locals_copy = dict()
                 for k, v in locals.items():
