@@ -7,6 +7,7 @@ from math import sin, cos, atan2, sqrt, ceil, floor, degrees, radians, log, pi, 
 from copy import deepcopy
 from time import process_time, time
 from weakref import WeakValueDictionary
+from itertools import chain
 from os.path import exists
 # from sys import exc_info
 import re
@@ -50,6 +51,7 @@ from kivy.core.window import Window # request keyboard
 from kivy.graphics.opengl import glEnable, glDisable, glFinish
 from kivy.resources import resource_find
 # from kivy.graphics.fbo import Fbo
+from kivy.animation import Animation
 
 import pymunk
 
@@ -611,6 +613,7 @@ class OurSandbox(FocusBehavior, ScatterPlane):
         self.rc2['texture1'] = 1
         # x, y, w, *stroke, *fill, a1, a2, *tr
         self.rc1_vfmt = (
+            (b'size',   2, 'float'),
             (b'center', 2, 'float'),
             (b'width',  1, 'float'),
             (b'stroke', 4, 'float'),
@@ -618,18 +621,17 @@ class OurSandbox(FocusBehavior, ScatterPlane):
             (b'angle_start', 1, 'float'),
             (b'angle_end',   1, 'float'),
             (b'transform',   4, 'float'),
-            (b'size',        2, 'float'),
             (b'tex_coords0', 2, 'float'),
             (b'tex_coords1', 2, 'float'),
         )
         self.rc2_vfmt = (
+            (b'size',   2, 'float'),
             (b'center', 2, 'float'),
             (b'radius', 1, 'float'),
             (b'width',  1, 'float'),
             (b'stroke', 4, 'float'),
             (b'fill',   4, 'float'),
             (b'transform', 4, 'float'),
-            (b'size',      2, 'float'),
             (b'tex_coords0', 2, 'float'),
             (b'tex_coords1', 2, 'float'),
         )
@@ -645,7 +647,10 @@ class OurSandbox(FocusBehavior, ScatterPlane):
             # glDisable(GL_FRAMEBUFFER_SRGB_EXT)
         # self.canvas.add(self.rc1)
         # self.canvas.add(self.rc2)
-        self.images = dict() #WeakValueDictionary()
+        self.shapes_by_trace = dict()
+        self.shapes_by_id = dict()
+        self.images = defaultdict(list)
+        self.image_meshes = defaultdict(list)
 
         Clock.schedule_interval(self.update_shader, 1 / 60.)
         glEnable(GL_VERTEX_PROGRAM_POINT_SIZE)
@@ -1131,9 +1136,11 @@ def update(dt):
             pass
 
     def update_sandbox(self, redraw=True):
+        redraw = True
         indices = [0, 3, 1, 2] #[0,3,1,2] #[0, 1, 3, 2]
         # [u, v, u + w, v, u + w, v + h, u, v + h]
         tex_coords_fill = tex_coords_stroke = 0.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0
+        # print('self.sandbox.shapes_by_trace', self.sandbox.shapes_by_trace)
         def update_texture(image, texture):
             # print("Hi!", self.sandbox.images, image.source)
             for mesh in self.sandbox.image_meshes[image.source]:
@@ -1142,14 +1149,30 @@ def update(dt):
             t1 = process_time()
             _global_update_colors()
             t2 = process_time()
-            if redraw:
-                self.sandbox.shapes = dict()
-                self.sandbox.images = defaultdict(list)
-                self.sandbox.image_meshes = defaultdict(list)
-            # with :
+            new_shapes = []
+            # new_render_shapes = dict
+            # shapes = []
+            old_shapes = set([shape for shape in self.sandbox.shapes_by_id.values()])
+            # old_shapes = {id(s[0][1][0]): (s[0][0], s[0][1][0]) for s in self.sandbox.shapes_by_id.values()}
+            # old_shapes = set([(s[0][0], id(s[0][1][0])) for s in self.sandbox.shapes_by_id.values()])
+            shape_ids = []
+            shape_traces = []
+            # old_shapes = set(self.sandbox.shapes_by_id.values())
+            if not redraw:
+                self.sandbox.shapes_by_trace = dict()
+                # pass
+            else:
+                Shape._trace_counters.clear()
+                self.sandbox.shapes_by_id = dict()
+            # if redraw:
+            #     self.sandbox.shapes_by_id = dict()
+            #     self.sandbox.images = defaultdict(list)
+            #     self.sandbox.image_meshes = defaultdict(list)
+            # with:
                 # if redraw:
                 #     self.ellipses = self.sandbox.make_ellipses()
             for shape in Shape.get_instances(True):
+                # print(shape, shape._trace, shape._trace_iter)
                 # textured = shape.fill is not None and isinstance(shape.fill, OurImage)
                 # if textured and not redraw and id(shape) in self.sandbox.shapes and \
                 #         shape.fill.source in self.sandbox.images:
@@ -1157,8 +1180,23 @@ def update(dt):
                 #     if image.anim_available:
                 #         print('Update texture!')
                 #         self.sandbox.shapes[id(shape)][0].texture = image.texture
-                if not redraw and not shape._is_modified and \
-                        id(shape) not in self.sandbox.shapes:
+                shape_ids.append(id(shape))
+                # self.sandbox.rendered_shapes.append(shape)
+                shape_trace = None
+                render_shape = None #if redraw else self.sandbox.shapes_by_id.get(id(shape))
+                if redraw:
+                    if shape._trace is not None:
+                        shape_trace = shape._trace, shape._trace_iter
+                        render_shape = self.sandbox.shapes_by_trace.get(shape_trace)
+                        if render_shape is not None:
+                            print('Saved: ', shape_trace)
+                        else:
+                            print('Not found', shape_trace)
+                        shape_traces.append(shape_trace)
+                        self.sandbox.shapes_by_id[id(shape)] = render_shape
+                else:
+                    render_shape = self.sandbox.shapes_by_id.get(id(shape))
+                if not redraw and render_shape is not None and not shape._is_modified:
                     continue
 
                 w = 0
@@ -1168,6 +1206,10 @@ def update(dt):
                 image_stroke = None
                 texture_fill = None
                 texture_stroke = None
+                vertices = []
+                render_context = None
+                vfmt = None
+                mesh = None
                 if shape.stroke is not None and shape.stroke.fill is not None:
                     if isinstance(shape.stroke.fill, OurImage):
                         stroke = 1, 1, 1, 1
@@ -1218,61 +1260,114 @@ def update(dt):
                     tr = tr[:4]
 
                 if isinstance(shape, Circle):
+                    render_context = self.sandbox.rc1
+                    vfmt = self.sandbox.rc1_vfmt
+
                     x, y = shape.center
                     a = b = shape.radius * 2
                     a1 = radians(shape.angle_start)
                     a2 = radians(shape.angle_end)
                     v_attrs = x, y, w, *stroke, *fill, a1, a2, *tr
-                    v0 = *v_attrs, +a, -b, *tex_coords_fill[0:2], *tex_coords_stroke[0:2]
-                    v1 = *v_attrs, -a, -b, *tex_coords_fill[2:4], *tex_coords_stroke[2:4]
-                    v2 = *v_attrs, -a, +b, *tex_coords_fill[4:6], *tex_coords_stroke[4:6]
-                    v3 = *v_attrs, +a, +b, *tex_coords_fill[6:8], *tex_coords_stroke[6:8]
+                    v0 = +a, -b, *v_attrs, *tex_coords_fill[0:2], *tex_coords_stroke[0:2]
+                    v1 = -a, -b, *v_attrs, *tex_coords_fill[2:4], *tex_coords_stroke[2:4]
+                    v2 = -a, +b, *v_attrs, *tex_coords_fill[4:6], *tex_coords_stroke[4:6]
+                    v3 = +a, +b, *v_attrs, *tex_coords_fill[6:8], *tex_coords_stroke[6:8]
                     vertices = v0 + v1 + v2 + v3
-                    if redraw or id(shape) not in self.sandbox.shapes:
-                        with self.sandbox.rc1:
-                            BindTexture(texture=texture_stroke, index=1)
-                            mesh = Mesh(fmt=self.sandbox.rc1_vfmt, mode='triangle_strip', vertices=vertices, indices=indices, texture=texture_fill) #, texture=grace_hopper.texture) #, source='grace_hopper.jpg')
-                        self.sandbox.shapes[id(shape)] = [mesh]
-                        if image_fill is not None:
-                            self.sandbox.image_meshes[image_fill.source].append(mesh)
-                        # if image_stroke is not None:
-                        #     self.sandbox.image_meshes[image_stroke.source].append(mesh)
-                        # if image is not None:
-                        #     def update_texture(*largs):
-                        #         mesh.texture = image.texture
-                        #     image.bind(texture=update_texture)
-                    else:
-                        self.sandbox.shapes[id(shape)][0].vertices = vertices
-                        # if self.sandbox.shapes[id(shape)][0].texture is not None:
-                            # self.sandbox.shapes[id(shape)][0].texture = image.texture
+
                 elif isinstance(shape, Rectangle):
+                    render_context = self.sandbox.rc2
+                    vfmt = self.sandbox.rc2_vfmt
+
                     x, y = shape.corner
                     a, b = shape.size
                     r = shape.radius
                     v_attrs = x, y, r, w, *stroke, *fill, *tr
-                    v0 = *v_attrs, +a, -b, *tex_coords_fill[0:2], *tex_coords_stroke[0:2]
-                    v1 = *v_attrs, -a, -b, *tex_coords_fill[2:4], *tex_coords_stroke[2:4]
-                    v2 = *v_attrs, -a, +b, *tex_coords_fill[4:6], *tex_coords_stroke[4:6]
-                    v3 = *v_attrs, +a, +b, *tex_coords_fill[6:8], *tex_coords_stroke[6:8]
+                    v0 = +a, -b, *v_attrs, *tex_coords_fill[0:2], *tex_coords_stroke[0:2]
+                    v1 = -a, -b, *v_attrs, *tex_coords_fill[2:4], *tex_coords_stroke[2:4]
+                    v2 = -a, +b, *v_attrs, *tex_coords_fill[4:6], *tex_coords_stroke[4:6]
+                    v3 = +a, +b, *v_attrs, *tex_coords_fill[6:8], *tex_coords_stroke[6:8]
                     vertices = v0 + v1 + v2 + v3
-                    # print('v0', v0)
-                    if redraw or id(shape) not in self.sandbox.shapes:
-                        # print('Rect TEX:', texture, tex_coords)
-                        with self.sandbox.rc2:
-                            BindTexture(texture=texture_stroke, index=1)
-                            mesh = Mesh(fmt=self.sandbox.rc2_vfmt, mode='triangle_strip', vertices=vertices, indices=indices, texture=texture_fill)#, source='grace_hopper.jpg')
-                        self.sandbox.shapes[id(shape)] = [mesh]
-                        if image_fill is not None:
-                            self.sandbox.image_meshes[image_fill.source].append(mesh)
-                        # if image is not None: # and redraw:
-                            # self.sandbox.images[image.source].append(mesh)
-                            # image.bind(texture=update_texture)
-                    else:
-                        self.sandbox.shapes[id(shape)][0].vertices = vertices
-                        # self.sandbox.shapes[id(shape)][0].texture=grace_hopper.texture
+
                 else:
                     raise NotImplementedError
 
+                new_shapes.append((
+                    id(shape), render_context, vfmt, texture_stroke, texture_fill, vertices,
+                    indices, 'triangle_strip', (image_fill,)
+                ))
+
+
+                if render_shape is None:  # id(shape) not in self.sandbox.shapes:
+                    with render_context:
+                        BindTexture(texture=texture_stroke, index=1)
+                        v_len = len(vertices) // 4
+                        # Set initial size to 0, 0
+                        initial_vs = tuple(0 if i % v_len in (0, 1) else v for i, v in enumerate(vertices))
+                        mesh = Mesh(
+                            fmt=vfmt, mode='triangle_strip', vertices=initial_vs,
+                            indices=indices, texture=texture_fill)
+                    self.sandbox.shapes_by_id[id(shape)] = ((render_context, (mesh, )), )
+                    if redraw and shape_trace:
+                        self.sandbox.shapes_by_trace[shape_trace] = ((render_context, (mesh, )), )
+                    if image_fill is not None:
+                        self.sandbox.image_meshes[image_fill.source].append(mesh)
+                else:
+                    mesh = render_shape[0][1][0]
+                # else:
+                    # self.sandbox.shapes[id(shape)][0].vertices = vertices
+
+                    # SO [1]: If an animation is repeated for many interactions (like a contextual
+                    # menu), a slower, more-perceivable animation (600ms) is going to feel quite
+                    # tedious to most of your users. Micro-animations (like a nav bar or a context
+                    # menu) of ~250ms will be noticeable by most people, but just noticeable enough
+                    # that they won't feel like they're waiting for it.
+                    #
+                    # SO [2]: The sweet spot that shows up time after time in game and UI design is
+                    # 250-300ms. For transitions that bounce or are elastic, 400-500ms lets the
+                    # motion read better.
+                # mesh.vertices = vertices
+                Animation(vertices=vertices, t='out_back', duration=0.4).start(mesh)
+
+            def remove_garbage(shapes):
+                for shape in shapes: #chain(shapes.get(oid, ()) for oid in oids):
+                    for context, instructions in shape:
+                        for inst in instructions:
+                            context.remove(inst)
+                # for oid in oids:
+                #     self.sandbox.shapes_by_id.pop(oid, None)
+            # to_remove = set(old_render_shapes) - set(shape_ids)
+            # old_shapes = {id(s[0][1][0]): (s[0][0], s[0][1][0]) for shape in self.sandbox.shapes_by_id.values()}
+            # print('old_shapes', old_shapes)
+            # print('new shapes', [id(s[0][1][0]) for s in self.sandbox.shapes_by_id.values()])
+            # to_remove = set(old_shapes) - set([id(s[0][1][0]) for s in self.sandbox.shapes_by_id.values()])
+            to_remove = old_shapes - set([shape for shape in self.sandbox.shapes_by_id.values()])
+
+            # for sid in to_remove:
+            #     context, mesh = old_shapes[sid]
+            for shape in to_remove:
+                for context, instructions in shape:
+                    for mesh in instructions:
+                        vertices = mesh.vertices
+                        v_len = len(vertices) // 4
+                        # Set initial size to 0, 0
+                        initial_vs = tuple(0 if i % v_len in (0, 1) else v for i, v in enumerate(vertices))
+                        Animation(vertices=initial_vs, t='in_back', duration=0.35).start(mesh)
+            # print('old_render_shapes', len(list(old_shapes)))
+            # print('self.sandbox.shapes_by_id.values()', len(self.sandbox.shapes_by_id.values()))
+            # print('to_remove', len(to_remove))
+            # print('self.sandbox.shapes_by_trace AFTER', self.sandbox.shapes_by_trace)
+            
+            # for oid in to_remove:
+                # self.sandbox.shapes_by_id.pop(oid, None)
+            for oid, shape in self.sandbox.shapes_by_id.items():
+                if shape in to_remove:
+                    # print('Removing', oid, shape)
+                    self.sandbox.shapes_by_id.pop(oid)
+            for shape_trace in set(self.sandbox.shapes_by_trace) - set(shape_traces):
+                self.sandbox.shapes_by_trace.pop(shape_trace)
+
+            # remove_garbage(to_remove)
+            Clock.schedule_once(lambda _:  remove_garbage(to_remove), 0.4 + 1 / 60)
 
             t3 = process_time()
 
@@ -1482,8 +1577,8 @@ def update(dt):
         saved = self.sandbox.children[:]
         self.sandbox.clear_widgets()
         self.sandbox.canvas.clear()
-        self.sandbox.rc1.clear()
-        self.sandbox.rc2.clear()
+        # self.sandbox.rc1.clear()
+        # self.sandbox.rc2.clear()
         Sprite.clear_sprites()
         if self.sandbox.space:
             self.sandbox.space.remove(*self.sandbox.space.shapes, *self.sandbox.space.bodies)
@@ -1496,6 +1591,7 @@ def update(dt):
             self.sandbox.add_widget(widget)
         self.sandbox.canvas.add(self.sandbox.rc1)
         self.sandbox.canvas.add(self.sandbox.rc2)
+
         # self.sandbox.fbo.add(self.sandbox.rc1)
         # self.sandbox.fbo.add(self.sandbox.rc2)
 

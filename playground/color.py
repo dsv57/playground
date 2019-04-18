@@ -685,9 +685,14 @@ class Color(KeepWeakRefs):
             self._color[3] == other._color[3]
 
     def __hash__(self):
-        if not (self._color and self._color[0] and self._color[1] \
+        if not (self._color and self._color[0] and (self._color[1] or self._color[5]) \
                 and self._color[3]):
             self._update_cam16()
+        elif self._color[1] is None:
+            cam16 = self._own_cam.cam16
+            J = self._color[0]
+            s = self._color[5]
+            C = self._color[1] = s**2 * sqrt(J) * (cam16.A_w + 4) / 25000 / cam16.c
         return hash((*self._color[:2], self._color[3]))
 
     def __repr__(self):
