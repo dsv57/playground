@@ -77,7 +77,7 @@ class Vector(object):
         return outer_fmt.format(*components)
 
     def __hash__(self):
-        return hash(self.x) ^ hash(self.y)
+        return hash((self.x, self.y))
 
     def __eq__(self, other):
         if isinstance(other, Iterable) and len(other) == 2:
@@ -85,14 +85,14 @@ class Vector(object):
             return self.x == x2 and self.y == y2
         else:
             return False
-    
+
     def __ne__(self, other):
         if isinstance(other, Iterable) and len(other) == 2:
             x2, y2 = _as_tuple(other)
             return self.x != x2 or self.y != y2
         else:
             return True
- 
+
     def __nonzero__(self):
         return self.x != 0.0 or self.y != 0.0
 
@@ -102,7 +102,7 @@ class Vector(object):
         x2, y2 = _as_tuple(other)
         return Vector(f(self.x, x2),
                       f(self.y, y2))
- 
+
     def _r_o2(self, other, f):
         "Any two-operator operation where the right operand is a Vector"
         x2, y2 = _as_tuple(other)
@@ -146,81 +146,81 @@ class Vector(object):
         x2, y2 = _as_tuple(other)
         return Vector(self.x * x2, self.y * y2)
     __rmul__ = __mul__
-    
+
     def __imul__(self, other):
         x2, y2 = _as_tuple(other)
         self.x *= x2
         self.y *= y2
         # UPDATE
         return self
- 
+
     def __div__(self, other):
         return self._o2(other, operator.div)
     def __rdiv__(self, other):
         return self._r_o2(other, operator.div)
     def __idiv__(self, other):
         return self._io(other, operator.div)
- 
+
     def __floordiv__(self, other):
         return self._o2(other, operator.floordiv)
     def __rfloordiv__(self, other):
         return self._r_o2(other, operator.floordiv)
     def __ifloordiv__(self, other):
         return self._io(other, operator.floordiv)
- 
+
     def __truediv__(self, other):
         return self._o2(other, operator.truediv)
     def __rtruediv__(self, other):
         return self._r_o2(other, operator.truediv)
     def __itruediv__(self, other):
         return self._io(other, operator.truediv)
- 
+
     def __mod__(self, other):
         return self._o2(other, operator.mod)
     def __rmod__(self, other):
         return self._r_o2(other, operator.mod)
- 
+
     def __divmod__(self, other):
         return self._o2(other, divmod)
     def __rdivmod__(self, other):
         return self._r_o2(other, divmod)
- 
+
     def __pow__(self, other):
         return self._o2(other, operator.pow)
     def __rpow__(self, other):
         return self._r_o2(other, operator.pow)
- 
+
     def __lshift__(self, other):
         return self._o2(other, operator.lshift)
     def __rlshift__(self, other):
         return self._r_o2(other, operator.lshift)
- 
+
     def __rshift__(self, other):
         return self._o2(other, operator.rshift)
     def __rrshift__(self, other):
         return self._r_o2(other, operator.rshift)
- 
+
     def __and__(self, other):
         return self._o2(other, operator.and_)
     __rand__ = __and__
- 
+
     def __or__(self, other):
         return self._o2(other, operator.or_)
     __ror__ = __or__
- 
+
     def _xor__(self, other):
         return self._o2(other, operator.xor)
     __rxor__ = _xor__
- 
+
     def __neg__(self):
         return Vector(operator.neg(self.x), operator.neg(self.y))
- 
+
     def __pos__(self):
         return Vector(operator.pos(self.x), operator.pos(self.y))
- 
+
     def __abs__(self):
         return Vector(abs(self.x), abs(self.y))
- 
+
     def __invert__(self):
         return Vector(-self.x, -self.y)
 
@@ -257,7 +257,7 @@ class Vector(object):
 
     # def get_length_sqrd(self):
     #     return self.x * self.x + self.y * self.y
- 
+
     @property
     def length(self):
         return hypot(self.x, self.y)
@@ -281,9 +281,9 @@ class Vector(object):
     #     return dx * dx + dy * dy
 
     def rotated(self, angle):
-        """Create and return a new vector by rotating this vector by 
+        """Create and return a new vector by rotating this vector by
         angle degrees.
-        
+
         :return: Rotated vector
         """
         c = cos(radians(angle))
@@ -291,8 +291,8 @@ class Vector(object):
         x = self.x * c - self.y * s
         y = self.x * s + self.y * c
         return Vector(x, y)
- 
-    @property    
+
+    @property
     def angle(self):
         if (self.length == 0):
             return 0
@@ -306,7 +306,7 @@ class Vector(object):
 
     def angle_between(self, other):
         """Get the angle between the vector and the other in radians
-        
+
         :return: The angle
         """
         x2, y2 = _as_tuple(other)
@@ -317,7 +317,7 @@ class Vector(object):
     def normalized(self):
         """Get a normalized copy of the vector
         Note: This function will return 0 if the length of the vector is 0.
-        
+
         :return: A normalized vector
         """
         length = self.length
@@ -327,7 +327,7 @@ class Vector(object):
 
     def normalize(self):
         """Normalize the vector and return its length before the normalization
-        
+
         :return: The length before the normalization
         """
         length = self.length
@@ -348,56 +348,56 @@ class Vector(object):
     def dot(self, other):
         """The dot product between the vector and other vector
             v1.dot(v2) -> v1.x*v2.x + v1.y*v2.y
-            
+
         :return: The dot product
         """
         x2, y2 = _as_tuple(other)
         return float(self.x * x2 + self.y * y2)
-                                
+
     def projection(self, other):
         x2, y2 = _as_tuple(other)
         other_length_sqrd = x2 * x2 + y2 * y2
         projected_length_times_other_length = self.dot(other)
         return other * (projected_length_times_other_length / other_length_sqrd)
-    
+
     def cross(self, other):
         """The cross product between the vector and other vector
             v1.cross(v2) -> v1.x*v2.y - v1.y*v2.x
-        
+
         :return: The cross product
         """
         x2, y2 = _as_tuple(other)
         return self.x * y2 - self.y * y1
-    
+
     def interpolate_to(self, other, range):
         x2, y2 = _as_tuple(other)
         return Vector(self.x + (x2 - self.x) * range, self.y + (y2 - self.y) * range)
-    
+
     # def convert_to_basis(self, x_vector, y_vector):
     #     x = self.dot(x_vector)/x_vector.get_length_sqrd()
     #     y = self.dot(y_vector)/y_vector.get_length_sqrd()
     #     return Vector(x, y)
-    
+
     # def __get_int_xy(self):
     #     return int(self.x), int(self.y)
-    # int_tuple = property(__get_int_xy, 
+    # int_tuple = property(__get_int_xy,
     #     doc="""Return the x and y values of this vector as ints""")
-    
+
     @staticmethod
     def zero():
         """A vector of zero length"""
         return Vector(0, 0)
-        
+
     @staticmethod
     def unit():
         """A unit vector pointing up"""
         return Vector(0, 1)
-        
+
     @staticmethod
     def ones():
         """A vector where both x and y is 1"""
         return Vector(1, 1)
- 
+
     # # Extra functions, mainly for chipmunk
     # def cpvrotate(self, other):
     #     """Uses complex multiplication to rotate this vector by the other. """
@@ -405,7 +405,7 @@ class Vector(object):
     # def cpvunrotate(self, other):
     #     """The inverse of cpvrotate"""
     #     return Vector(self.x*other.x + self.y*other.y, self.y*other.x - self.x*other.y)
-    
+
     # Pickle
     def __reduce__(self):
         callable = Vector
@@ -466,8 +466,7 @@ class VectorRef(Vector):
         yield y
 
     def __hash__(self):
-        x, y = self._fget()
-        return hash(x) ^ hash(y)
+        return hash((self._fget, self._fset))
 
     def __eq__(self, other):
         x, y = self._fget()
@@ -476,7 +475,7 @@ class VectorRef(Vector):
             return x == x2 and y == y2
         else:
             return False
-    
+
     def __ne__(self, other):
         x, y = self._fget()
         if isinstance(other, Iterable) and len(other) == 2:
@@ -532,7 +531,7 @@ class VectorRef(Vector):
     def __mul__(self, other):
         return Vector(self) * other
     __rmul__ = __mul__
-    
+
     def __imul__(self, other):
         x, y = self._fget()
         x2, y2 = _as_tuple(other)
@@ -571,9 +570,9 @@ class VectorRef(Vector):
         return hypot(x - x2, y - y2)
 
     def rotated(self, angle):
-        """Create and return a new vector by rotating this vector by 
+        """Create and return a new vector by rotating this vector by
         angle degrees.
-        
+
         :return: Rotated vector
         """
         x, y = self._fget()
@@ -583,7 +582,7 @@ class VectorRef(Vector):
         y2 = x * s + y * c
         return Vector(x2, y2)
 
-    @property    
+    @property
     def angle(self):
         if (self.length == 0):
             return 0
@@ -600,7 +599,7 @@ class VectorRef(Vector):
 
     def angle_between(self, other):
         """Get the angle between the vector and the other in radians
-        
+
         :return: The angle
         """
         x, y = self._fget()
@@ -612,7 +611,7 @@ class VectorRef(Vector):
     def normalized(self):
         """Get a normalized copy of the vector
         Note: This function will return 0 if the length of the vector is 0.
-        
+
         :return: A normalized vector
         """
         length = self.length
@@ -622,7 +621,7 @@ class VectorRef(Vector):
 
     def normalize(self):
         """Normalize the vector and return its length before the normalization
-        
+
         :return: The length before the normalization
         """
         x, y = self._fget()
@@ -643,29 +642,29 @@ class VectorRef(Vector):
     def dot(self, other):
         """The dot product between the vector and other vector
             v1.dot(v2) -> v1.x*v2.x + v1.y*v2.y
-            
+
         :return: The dot product
         """
         x, y = self._fget()
         x2, y2 = _as_tuple(other)
         return float(x * x2 + y * y2)
-                                
+
     def projection(self, other):
         x2, y2 = _as_tuple(other)
         other_length_sqrd = x2 * x2 + y2 * y2
         projected_length_times_other_length = self.dot(other)
         return other * (projected_length_times_other_length / other_length_sqrd)
-    
+
     def cross(self, other):
         """The cross product between the vector and other vector
             v1.cross(v2) -> v1.x*v2.y - v1.y*v2.x
-        
+
         :return: The cross product
         """
         x, y = self._fget()
         x2, y2 = _as_tuple(other)
         return x * y2 - y * y1
-    
+
     def interpolate_to(self, other, range):
         x, y = self._fget()
         x2, y2 = _as_tuple(other)
@@ -703,7 +702,7 @@ class VectorRefProperty(object):
 
 class Transform(object):
     __slots__ = ('a', 'b', 'c', 'd', 'tx', 'ty')
-    
+
     def __init__(self, *largs, translate=None, rotate=None, scale=None, skew=None, anchor=(0, 0)):  # a=None, b=None, c=None, d=None, tx=None, ty=None):
         if largs:
             self.a, self.b, self.c, self.d, self.tx, self.ty = largs
@@ -773,19 +772,21 @@ class Transform(object):
         return 6
 
     def __hash__(self):
-        return hash(self.a) ^ hash(self.b) ^ hash(self.c) \
-            ^ hash(self.d) ^ hash(self.tx) ^ hash(self.ty)
+        return hash((self.a, self.b, self.c, self.d, self.tx, self.ty))
 
     def __eq__(self, other):  # FIXME: isinstance
         if isinstance(other, Iterable) and len(other) >= 2:
             return all(self[i, j] == other[i, j] for i in range(2) for j in range(3))
         return False
-    
+
     def __ne__(self, other):  # FIXME: isinstance
         if isinstance(other, Iterable) and len(other) >= 2:
             return any(self[i, j] != other[i, j] for i in range(2) for j in range(3))
         return True
- 
+
+    def __nonzero__(self):
+        return tuple(self) != 1., 0., 0., 1., 0., 0.
+
     def __add__(self, other):
         if isinstance(other, Iterable) and len(other) == 2:
             return Transform(*self, translate=other)
@@ -814,9 +815,11 @@ class Transform(object):
         self.ty += float(ty)
 
     def rotate(self, angle, anchor=(0, 0)):
-        c = cos(radians(angle))
-        s = sin(radians(angle))
-        self.combine(Transform(c, s, -s, c, 0, 0), anchor=anchor)
+        co = cos(radians(angle))
+        si = sin(radians(angle))
+        a, b, c, d = co, si, -si, co
+        ax, ay = anchor
+        self @= (a, b, c, d, (a*ax + b*ay - ax), (c*ax + d*ay - ay))
 
     def scale(self, sx, sy=None, anchor=(0, 0)):
         if sy == None:
@@ -824,23 +827,28 @@ class Transform(object):
             #     sx, sy = sx
             # else:
             sy = sx
-        self.combine(Transform(sx, 0, 0, sy, 0, 0), anchor=anchor)
+        a, b, c, d = sx, 0, 0, sy
+        ax, ay = anchor
+        self @= a, b, c, d, a*ax + b*ay - ax, c*ax + d*ay - ay
 
     def skew(self, ax, ay=0, anchor=(0, 0)):
-        self.combine(Transform(1, tan(radians(ay)), tan(radians(ax)), 1, 0, 0), anchor=anchor)
+        a, b, c, d = 1, tan(radians(ay)), tan(radians(ax)), 1
+        ax, ay = anchor
+        self @= a, b, c, d, a*ax + b*ay - ax, c*ax + d*ay - ay
 
     def _reflect_unit(self, ux, uy, anchor=(0, 0)):
-        self.combine(Transform(
-            2.0 * ux * ux - 1.0, 2.0 * ux * uy,
-            2.0 * ux * uy, 2.0 * uy * uy - 1.0,
-            0.0, 0.0), anchor=anchor)
+        a = 2.0 * ux * ux - 1.0
+        b = 2.0 * ux * uy
+        c = 2.0 * ux * uy
+        d = 2.0 * uy * uy - 1.0
+        ax, ay = anchor
+        self @= a, b, c, d, a*ax + b*ay - ax, c*ax + d*ay - ay
 
     def reflect(self, x, y, anchor=(0, 0)):
         h = hypot(x, y)
         self._reflect_unit(x / h, y / h, anchor)
 
     def reflect_angle(self, angle, anchor=(0, 0)):
-        h = hypot(x, y)
         self._reflect_unit(cos(radians(angle)), sin(radians(angle)), anchor)
 
     # reflection
@@ -848,9 +856,9 @@ class Transform(object):
     def combine(self, other, apply_before=False, anchor=(0, 0)):
         a, b, c, d, tx, ty = other
         ax, ay = anchor
-        t = Transform(a, b, c, d, a*ax + b*ay + tx - ax, c*ax + d*ay + ty - ay)
 
         if apply_before:
+            t = Transform(a, b, c, d, a*ax + b*ay + tx - ax, c*ax + d*ay + ty - ay)
             t @= self
             self.a = t.a
             self.b = t.b
@@ -859,15 +867,14 @@ class Transform(object):
             self.tx = t.tx
             self.ty = t.ty
         else:
-            self @= t
+            self @= a, b, c, d, a*ax + b*ay + tx - ax, c*ax + d*ay + ty - ay
 
     def __imatmul__(self, other):
-        self.a = self.a*other.a + self.b*other.c
-        self.b = self.a*other.b + self.b*other.d
-        self.c = other.a*self.c + other.c*self.d
-        self.d = other.b*self.c + self.d*other.d
-        self.tx += self.a*other.tx + self.b*other.ty
-        self.ty += self.c*other.tx + self.d*other.ty
+        a, b, c, d, tx, ty = other  # FIXME
+        self.a, self.b = self.a*a + self.b*c, self.a*b + self.b*d  ##1*0.5 + 0*0.866
+        self.c, self.d = a*self.c + c*self.d, b*self.c + self.d*d  ##
+        self.tx += self.a*tx + self.b*ty
+        self.ty += self.c*tx + self.d*ty
         return self
 
     def __matmul__(self, other):

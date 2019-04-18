@@ -42,7 +42,7 @@ from pymunk import Body
 # from pymunk.vec2d import Vec2d
 from named_colors import COLORS
 
-from playground.vector import Vector, VectorRef, VectorRefProperty
+from playground.geometry import Vector, VectorRef, VectorRefProperty
 
 
 def trace_image(img, threshold=3, simplify_tolerance=0.7, cache=True):
@@ -956,7 +956,9 @@ class Sprite(Scatter):
         print('CLEAR ' * 20)
         for sprite in Sprite._instances:
             if sprite.space:
-                sprite.space.remove(*sprite.pymunk_shapes, sprite.body)
+                sprite.space.remove(*sprite.pymunk_shapes)
+                if sprite.body.body_type == DYNAMIC:
+                    sprite.space.remove(sprite.body)
         Sprite._instances = WeakSet()
 
     @property
@@ -994,6 +996,10 @@ class Sprite(Scatter):
             self.body.velocity = 0, 0
             self.body.angular_velocity = 0
         else:
+            if abs(self.body.position.x) > 10000 or abs(self.body.position.y) > 10000:
+                self.space.remove(*sprite.pymunk_shapes)
+                self.space.remove(sprite.body)
+                return
             _rotation = (360 - (Vector(self.to_parent(0, 10)) - self.to_parent(0, 0)).angle_between((0, 10))) % 360
             rotation = degrees(self.body.angle)
             angle_change = _rotation - rotation
