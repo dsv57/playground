@@ -19,8 +19,8 @@ varying vec4  v_fill;
 varying float v_scale;
 
 /* vertex attributes */
-attribute vec2  center;
 attribute vec2  size;
+attribute vec2  center;
 attribute float radius;
 attribute float width;
 attribute vec4  stroke;

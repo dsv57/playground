@@ -20,6 +20,7 @@ varying float v_angle_end;
 varying float v_scale;
 
 /* vertex attributes */
+attribute vec2  size;
 attribute vec2  center;
 attribute float width;
 attribute vec4  stroke;
@@ -27,7 +28,6 @@ attribute vec4  fill;
 attribute float angle_start;
 attribute float angle_end;
 attribute vec4  transform;
-attribute vec2  size;
 attribute vec2  tex_coords0;
 attribute vec2  tex_coords1;
 
