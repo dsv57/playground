@@ -169,6 +169,7 @@ float SDF_sector(vec2 p, float a, float b) {
 // a *= min(1. - (abs(d)-b), 1.);
 void main() {
     vec4 clr;
+    vec4 stroke;
     float alpha;
     float d;
     // if ((v_width*scale > 10.) || (v_size.x / v_size.y > 3.)) {
@@ -180,18 +181,17 @@ void main() {
         d = max(d, SDF_sector(v_position, v_angle_start, v_angle_end));
     }
 
+    clr = v_fill * srgb_to_linear(texture2D(texture0, tex_coord0));
     if (v_width > 0.01) { /* Stroke */
         alpha = clamp(1. - (abs(d) - v_width / 2.) * v_scale, 0., 1.);
-        clr = v_stroke * srgb_to_linear(texture2D(texture1, tex_coord1));
+        stroke = v_stroke * srgb_to_linear(texture2D(texture1, tex_coord1));
         if (d < 0.) {
-            clr = mix(v_fill, clr, alpha);
+            clr = mix(clr, stroke, alpha);
         } else {
-            // clr = v_stroke;// * srgb_to_linear(texture2D(texture1, tex_coord1));
-            clr.a *= alpha;
+            clr = vec4(stroke.rgb, stroke.w * alpha);
         }
     } else { /* Fill */
         alpha = clamp(1. - (d - v_width / 2.) * v_scale, 0., 1.);
-        clr = v_fill * srgb_to_linear(texture2D(texture0, tex_coord0));
         clr.a *= alpha;
     }
 

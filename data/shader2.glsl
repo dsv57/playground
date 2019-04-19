@@ -8,9 +8,9 @@ const float M_PI = 3.14159265358979323846264338327950288;
 const float M_PI_2 = 1.57079632679489661923132169163975144;
 
 /* Outputs to the fragment shader */
+varying vec2  tex_coord0;
+varying vec2  tex_coord1;
 varying vec2  v_position;
-varying vec2  v_tex_coord0;
-varying vec2  v_tex_coord1;
 varying vec2  v_size;
 varying float v_radius;
 varying float v_width;
@@ -39,8 +39,8 @@ uniform vec2  resolution;
 uniform float time;
 
 void main (void) {
-  v_tex_coord0 = tex_coords0;
-  v_tex_coord1 = tex_coords1;
+  tex_coord0 = tex_coords0;
+  tex_coord1 = tex_coords1;
   v_radius = radius; //(1.+cos(time*3.))*5.;
   v_width = width; //(1.+cos(time*3.))*5.;
   v_stroke = stroke;
@@ -77,8 +77,8 @@ const float M_PI_2 = 1.57079632679489661923132169163975144;
 
 /* Outputs from the vertex shader */
 varying vec2  v_position;
-varying vec2  v_tex_coord0;
-varying vec2  v_tex_coord1;
+varying vec2  tex_coord0;
+varying vec2  tex_coord1;
 varying vec2  v_size;
 varying float v_radius;
 varying float v_width;
@@ -120,21 +120,21 @@ float SDF_round_box(vec2 p, vec2 size, float radius)
 // a *= min(1. - (abs(d)-b), 1.);
 void main() {
     vec4 clr;
+    vec4 stroke;
     float alpha;
     float d = SDF_round_box(v_position, v_size / 2., v_radius);
 
+    clr = v_fill * srgb_to_linear(texture2D(texture0, tex_coord0));
     if (v_width > 0.01) { /* Stroke */
         alpha = clamp(1. - (abs(d) - v_width / 2.) * v_scale, 0., 1.);
+        stroke = v_stroke * srgb_to_linear(texture2D(texture1, tex_coord1));
         if (d < 0.) {
-            clr = mix(v_fill, v_stroke, alpha); //vec4(.5,.0,.0,.5);//
-            // clr.a = .7;
+            clr = mix(clr, stroke, alpha);
         } else {
-            clr = v_stroke * srgb_to_linear(texture2D(texture1, v_tex_coord1));
-            clr.a *= alpha;
+            clr = vec4(stroke.rgb, stroke.w * alpha);
         }
     } else { /* Fill */
         alpha = clamp(1. - (d - v_width / 2.) * v_scale, 0., 1.);
-        clr = v_fill * srgb_to_linear(texture2D(texture0, v_tex_coord0));
         clr.a *= alpha;
     }
 
