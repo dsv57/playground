@@ -78,6 +78,10 @@ F_UPDATE = 'update'
 F_ON_KEY_PRESS = 'on_key_press'
 F_ON_KEY_RELEASE = 'on_key_release'
 
+TRANSITION_TIME = 0.4
+TRANSITION_IN = 'in_back'
+TRANSITION_OUT = 'out_back'
+
 R_TURN = re.compile(r'^(\s*)(right|left|up|down)\(([0-9]*)\)$')
 
 grace_hopper = Image(source='grace_hopper.jpg', mipmap=True, anim_delay=0.04166) #, keep_data=True)
@@ -173,6 +177,34 @@ grace_hopper = Image(source='grace_hopper.jpg', mipmap=True, anim_delay=0.04166)
 # grad = radial_gradient()
 # glFinish()
 # print('GRAD', grad, grad.tex_coords)
+
+def debounce(wait):
+    """ Decorator that will postpone a functions
+        execution until after wait seconds
+        have elapsed since the last time it was invoked. """
+
+    def decorator(fn):
+        def debounced(*args, **kwargs):
+            def call_it(*t):
+                debounced._timer = None
+                debounced._last_call = time()
+                return fn(*args, **kwargs)
+
+            time_since_last_call = time() - debounced._last_call
+            if time_since_last_call >= wait:
+                return call_it()
+
+            if debounced._timer is None:
+                # debounced._timer = threading.Timer(wait - time_since_last_call, call_it)
+                debounced._timer = Clock.schedule_once(call_it, wait - time_since_last_call)
+                # debounced._timer.start()
+
+        debounced._timer = None
+        debounced._last_call = 0
+
+        return debounced
+
+    return decorator
 
 def whos(vars, max_repr=40):
     w_types = (int, float, str, list, dict, tuple)
@@ -652,6 +684,8 @@ class OurSandbox(FocusBehavior, ScatterPlane):
         self.images = defaultdict(list)
         self.image_meshes = defaultdict(list)
 
+        self.transition_time = TRANSITION_TIME
+
         Clock.schedule_interval(self.update_shader, 1 / 60.)
         glEnable(GL_VERTEX_PROGRAM_POINT_SIZE)
 
@@ -1028,7 +1062,11 @@ def update(dt):
         self.code_editor.focus_next = self.sandbox
         self.sandbox.focus_next = self.code_editor
 
+        #@debounce(0.2)
         def _set_var(wid, value):
+            self.sandbox.transition_time = 0.2
+            self.sandbox.transition_in = 'in_cubic'
+            self.sandbox.transition_out = 'out_cubic'
             self.vars[wid.var_name] = value
             if wid.var_name in self.runner.common_vars:
                 self.trigger_exec()
@@ -1136,7 +1174,7 @@ def update(dt):
             pass
 
     def update_sandbox(self, redraw=True):
-        redraw = True
+        # redraw = True
         indices = [0, 3, 1, 2] #[0,3,1,2] #[0, 1, 3, 2]
         # [u, v, u + w, v, u + w, v + h, u, v + h]
         tex_coords_fill = tex_coords_stroke = 0.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0
@@ -1158,12 +1196,11 @@ def update(dt):
             shape_ids = []
             shape_traces = []
             # old_shapes = set(self.sandbox.shapes_by_id.values())
-            if not redraw:
-                self.sandbox.shapes_by_trace = dict()
-                # pass
-            else:
+            if redraw:
                 Shape._trace_counters.clear()
                 self.sandbox.shapes_by_id = dict()
+            # else:
+            #     self.sandbox.shapes_by_trace = dict()
             # if redraw:
             #     self.sandbox.shapes_by_id = dict()
             #     self.sandbox.images = defaultdict(list)
@@ -1182,22 +1219,19 @@ def update(dt):
                 #         self.sandbox.shapes[id(shape)][0].texture = image.texture
                 shape_ids.append(id(shape))
                 # self.sandbox.rendered_shapes.append(shape)
-                shape_trace = None
                 render_shape = None #if redraw else self.sandbox.shapes_by_id.get(id(shape))
+                shape_trace = (shape._trace, shape._trace_iter) if shape._trace else None
+                if shape_trace is not None:
+                    shape_traces.append(shape_trace)
+
                 if redraw:
-                    if shape._trace is not None:
-                        shape_trace = shape._trace, shape._trace_iter
+                    if shape_trace is not None:
                         render_shape = self.sandbox.shapes_by_trace.get(shape_trace)
-                        if render_shape is not None:
-                            print('Saved: ', shape_trace)
-                        else:
-                            print('Not found', shape_trace)
-                        shape_traces.append(shape_trace)
                         self.sandbox.shapes_by_id[id(shape)] = render_shape
                 else:
                     render_shape = self.sandbox.shapes_by_id.get(id(shape))
-                if not redraw and render_shape is not None and not shape._is_modified:
-                    continue
+                # if not redraw and render_shape is not None and not shape._is_modified:
+                #     continue
 
                 w = 0
                 stroke = 0, 0, 0, 0
@@ -1217,11 +1251,12 @@ def update(dt):
                         image_stroke = self.sandbox.images.get(source)
                         if not image_stroke:
                             image_stroke = Image(
-                                source=source,
+                                source=source, mipmap=True,
                                 anim_delay=shape.stroke.fill.anim_delay)
                             self.sandbox.images[source] = image_stroke
                             # self.sandbox.images[shape.fill.source] = image
                             # image.bind(texture=update_texture) # TODO: Animation
+                            # TODO: If not exists (image_stroke.texture is None)...
                         texture_stroke = image_stroke.texture
                         tex_coords_stroke = texture_stroke.tex_coords
                     else:
@@ -1236,11 +1271,12 @@ def update(dt):
                         image_fill = self.sandbox.images.get(source)
                         if not image_fill: #shape.fill.source not in self.sandbox.images:
                             image_fill = Image(
-                                source=source,
+                                source=source, mipmap=True,
                                 anim_delay=shape.fill.anim_delay)
                             self.sandbox.images[source] = image_fill
                             # self.sandbox.images[shape.fill.source] = image
                             image_fill.bind(texture=update_texture)
+                            # TODO: If not exists (image_stroke.texture is None)...
                         texture_fill = image_fill.texture
                         tex_coords_fill = texture_fill.tex_coords
                     else:
@@ -1300,14 +1336,17 @@ def update(dt):
                 if render_shape is None:  # id(shape) not in self.sandbox.shapes:
                     with render_context:
                         BindTexture(texture=texture_stroke, index=1)
-                        v_len = len(vertices) // 4
-                        # Set initial size to 0, 0
-                        initial_vs = tuple(0 if i % v_len in (0, 1) else v for i, v in enumerate(vertices))
+                        if redraw and self.sandbox.transition_time > 0:
+                            v_len = len(vertices) // 4
+                            # Set initial size to 0, 0
+                            initial_vs = tuple(0 if i % v_len in (0, 1) else v for i, v in enumerate(vertices))
+                        else:
+                            initial_vs = vertices
                         mesh = Mesh(
                             fmt=vfmt, mode='triangle_strip', vertices=initial_vs,
                             indices=indices, texture=texture_fill)
                     self.sandbox.shapes_by_id[id(shape)] = ((render_context, (mesh, )), )
-                    if redraw and shape_trace:
+                    if shape_trace:
                         self.sandbox.shapes_by_trace[shape_trace] = ((render_context, (mesh, )), )
                     if image_fill is not None:
                         self.sandbox.image_meshes[image_fill.source].append(mesh)
@@ -1326,7 +1365,12 @@ def update(dt):
                     # 250-300ms. For transitions that bounce or are elastic, 400-500ms lets the
                     # motion read better.
                 # mesh.vertices = vertices
-                Animation(vertices=vertices, t='out_back', duration=0.4).start(mesh)
+                if redraw and self.sandbox.transition_time > 0:
+                    Animation.cancel_all(mesh)
+                    Animation(vertices=vertices, t=self.sandbox.transition_out,
+                        duration=self.sandbox.transition_time).start(mesh)
+                else:
+                    mesh.vertices = vertices
 
             def remove_garbage(shapes):
                 for shape in shapes: #chain(shapes.get(oid, ()) for oid in oids):
@@ -1337,37 +1381,45 @@ def update(dt):
                 #     self.sandbox.shapes_by_id.pop(oid, None)
             # to_remove = set(old_render_shapes) - set(shape_ids)
             # old_shapes = {id(s[0][1][0]): (s[0][0], s[0][1][0]) for shape in self.sandbox.shapes_by_id.values()}
-            # print('old_shapes', old_shapes)
-            # print('new shapes', [id(s[0][1][0]) for s in self.sandbox.shapes_by_id.values()])
+            print('old_shapes', len(old_shapes))
+            print('new shapes', len([id(s[0][1][0]) for s in self.sandbox.shapes_by_id.values()]))
             # to_remove = set(old_shapes) - set([id(s[0][1][0]) for s in self.sandbox.shapes_by_id.values()])
             to_remove = old_shapes - set([shape for shape in self.sandbox.shapes_by_id.values()])
 
-            # for sid in to_remove:
-            #     context, mesh = old_shapes[sid]
-            for shape in to_remove:
-                for context, instructions in shape:
-                    for mesh in instructions:
-                        vertices = mesh.vertices
-                        v_len = len(vertices) // 4
-                        # Set initial size to 0, 0
-                        initial_vs = tuple(0 if i % v_len in (0, 1) else v for i, v in enumerate(vertices))
-                        Animation(vertices=initial_vs, t='in_back', duration=0.35).start(mesh)
-            # print('old_render_shapes', len(list(old_shapes)))
-            # print('self.sandbox.shapes_by_id.values()', len(self.sandbox.shapes_by_id.values()))
-            # print('to_remove', len(to_remove))
-            # print('self.sandbox.shapes_by_trace AFTER', self.sandbox.shapes_by_trace)
-            
-            # for oid in to_remove:
-                # self.sandbox.shapes_by_id.pop(oid, None)
-            for oid, shape in self.sandbox.shapes_by_id.items():
-                if shape in to_remove:
-                    # print('Removing', oid, shape)
-                    self.sandbox.shapes_by_id.pop(oid)
+
             for shape_trace in set(self.sandbox.shapes_by_trace) - set(shape_traces):
                 self.sandbox.shapes_by_trace.pop(shape_trace)
 
+            # for sid in to_remove:
+            #     context, mesh = old_shapes[sid]
+            if self.sandbox.transition_time > 0:
+                for shape in to_remove:
+                    for context, instructions in shape:
+                        for mesh in instructions:
+                            Animation.cancel_all(mesh)
+                            vertices = mesh.vertices
+                            v_len = len(vertices) // 4
+                            # Set initial size to 0, 0
+                            initial_vs = tuple(0 if i % v_len in (0, 1) else v for i, v in enumerate(vertices))
+                            Animation(vertices=initial_vs, t=self.sandbox.transition_in,
+                                duration=self.sandbox.transition_time).start(mesh)
+                Clock.schedule_once(lambda _:  remove_garbage(to_remove), self.sandbox.transition_time + 1 / 60.)
+            else:
+                remove_garbage(to_remove)
+
+            # print('old_render_shapes', len(list(old_shapes)))
+            # print('self.sandbox.shapes_by_id.values()', len(self.sandbox.shapes_by_id.values()))
+            print('to_remove', len(to_remove))
+            print('self.sandbox.shapes_by_trace AFTER', len(self.sandbox.shapes_by_trace))
+
+            # for oid in to_remove:
+                # self.sandbox.shapes_by_id.pop(oid, None)
+            # for oid, shape in self.sandbox.shapes_by_id.items():
+            #     if shape in to_remove:
+            #         # print('Removing', oid, shape)
+            #         self.sandbox.shapes_by_id.pop(oid)
+
             # remove_garbage(to_remove)
-            Clock.schedule_once(lambda _:  remove_garbage(to_remove), 0.4 + 1 / 60)
 
             t3 = process_time()
 
@@ -1505,10 +1557,14 @@ def update(dt):
         #         # print("STATS:", instrs, st_ch, st_n)
         # except KeyError as e:
         #     print('update_sandbox:', e)
+        # Reset transition time
+        self.sandbox.transition_time = TRANSITION_TIME
+        self.sandbox.transition_in = TRANSITION_IN
+        self.sandbox.transition_out = TRANSITION_OUT
 
     def compile_code(self, *largs):
-        if self.update_schedule is not None:
-            self.update_schedule.cancel()
+        # if self.update_schedule is not None:
+        #     self.update_schedule.cancel()
         breakpoint = None
         if self.run_to_cursor:
             breakpoint = self.code_editor.cursor_row + 1
@@ -1535,12 +1591,12 @@ def update(dt):
         else:
             self.code_editor.highlight_line(None)
             if COMMON_CODE in changed:
-                print('-='*30)
-                print(self.code)
-                print('-='*30)
+                # print('-='*30)
+                # print(self.code)
+                # print('-='*30)
                 self.trigger_exec()
                 changed.remove(COMMON_CODE)
-            print('EXEC Changed:', changed)
+            # print('EXEC Changed:', changed)
             try:
                 if self.runner.execute(changed) and F_UPDATE in self.runner.globals \
                         and not (self.update_schedule and self.update_schedule.is_triggered):
@@ -1554,6 +1610,8 @@ def update(dt):
     def execute_code(self, *largs):
         print('execute_code')
         self.status = ('EXEC',)
+        if self.update_schedule:
+            self.update_schedule.cancel()
         self._gravity = Vector(0, 0)
         self._show_clipped = True
         self.runner.reset(globals=self.vars)
@@ -1587,7 +1645,7 @@ def update(dt):
         self.sandbox.space.sleep_time_threshold = 3.0
         self.sandbox.space.replay_mode = False
         for widget in saved:
-            print('SAVED:', widget)
+            # print('SAVED:', widget)
             self.sandbox.add_widget(widget)
         self.sandbox.canvas.add(self.sandbox.rc1)
         self.sandbox.canvas.add(self.sandbox.rc2)
@@ -1644,15 +1702,15 @@ def update(dt):
         print('- ' * 40)
 
         # FIXME: add scene spdiff
-        self.update_sandbox()
+        # self.update_sandbox()
         # if self.sokoban:
         #     self.replay_step = len(self.sokoban.log)
         #     self.replay_steps = len(self.sokoban.log)
 
         # self.code_editor.highlight_line(None)
         if not ok:
-            if self.update_schedule:
-                self.update_schedule.cancel()
+            # if self.update_schedule:
+            #     self.update_schedule.cancel()
             if self.runner.exception:
                 # for l in self.runner.traceback.format():
                 #     print(l[:300])
@@ -1693,15 +1751,19 @@ def update(dt):
         else:
             self.status = ('COMPLETE',)
             self.code_editor.highlight_line(None)
+            if F_UPDATE in self.runner.globals:
+                self._last_update_time = time()
+            self.update_sandbox()
             # if self.sokoban and self.sokoban.boxes_remaining == 0:
             #     print('Level completed:', self.sokoban.level)
             #     self.sokoban.level += 1
             #     self.sandbox.clear_widgets()
             if F_UPDATE in self.runner.globals:  # and (not self.update_schedule or not self.update_schedule.is_triggered):
-                self._last_update_time = time()
-                if self.update_schedule:
-                    self.update_schedule.cancel()
-                self.update_schedule = Clock.schedule_interval(self.trigger_exec_update, 1.0 / 60.0)
+                # self.sandbox.transition_time = 0
+
+                def run_update(*t):
+                    self.update_schedule = Clock.schedule_interval(self.trigger_exec_update, 1.0 / 60.0)
+                self.update_schedule = Clock.schedule_once(run_update, self.sandbox.transition_time)
 
         self.watches = watches
         print('= ' * 40)

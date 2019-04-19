@@ -265,8 +265,11 @@ class CodeRunner:
                         locals_copy[k] = deepcopy(v)
                     except:
                         pass
-                line = linecache.getline(filename, lineno).strip() \
-                       or self._source.splitlines()[lineno-1].strip()
+                line = linecache.getline(filename, lineno).strip()
+                if not line:
+                    lines = self._source.splitlines()
+                    if len(lines) >= lineno:
+                        line = lines[lineno-1].strip()
                 out.append((filename, lineno, name, line, locals_copy))
             depth += 1
             tb = tb.tb_next

@@ -953,7 +953,6 @@ class Sprite(Scatter):
 
     @staticmethod
     def clear_sprites():
-        print('CLEAR ' * 20)
         for sprite in Sprite._instances:
             if sprite.space:
                 sprite.space.remove(*sprite.pymunk_shapes)
