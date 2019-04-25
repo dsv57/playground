@@ -247,6 +247,7 @@ class CodeEditor(CodeInput, FocusBehavior):
         self.register_event_type('on_key_down')
 
         super(CodeEditor, self).__init__(**kwargs)
+        self.cursor = 0, 0
 
     # Kivy bug workaround
     def get_cursor_from_xy(self, x, y):
@@ -521,6 +522,45 @@ class CodeEditor(CodeInput, FocusBehavior):
         #         key_str = '\n' + key_str
         #     self.insert_text(f'{key_str}()')
         #     return True
+        elif key == 47 and modifiers == ['ctrl']:
+            cc, cr = self.cursor
+            _lines = self._lines
+
+            if self._selection:
+                a, b = self._selection_from, self._selection_to
+                cc_from, cr_from = self.get_cursor_from_index(a)
+                cc_to, cr_to = self.get_cursor_from_index(b)
+            else:
+                cc_from, cr_from = self.cursor
+                cc_to, cr_to = cc_from, cr_from
+            uncomment = True #_lines[min(cr_from, cr_to)].lstrip().startswith('#')
+            indent = 1000
+            for cr in range(min(cr_from, cr_to), max(cr_from, cr_to) + 1):
+                line = _lines[cr]
+                if not line.lstrip().startswith('#'):
+                    uncomment = False
+                indent = min(indent, len(line) - len(line.lstrip()))
+
+            for cr in range(min(cr_from, cr_to), max(cr_from, cr_to) + 1):
+                line = _lines[cr]
+                if not uncomment:
+                    new_text = f'{" " * indent}# {line[indent:]}'
+                    self._set_line_text(cr, new_text)
+                    if cr == cr_from: cc_from += 2
+                    if cr == cr_to: cc_to += 2
+                else:
+                    new_text = re.sub(r'^(\s*)# ?', r'\1', line)
+                    removed = len(line) - len(new_text)
+                    self._set_line_text(cr, new_text)
+                    if cr == cr_from: cc_from = max(0, cc_from - removed)
+                    if cr == cr_to: cc_to = max(0, cc_to - removed)
+            self._selection_from = self.cursor_index((cc_from, cr_from))
+            self._selection_to = self.cursor_index((cc_to, cr_to))
+            self._selection_finished = True
+            self._update_selection(True)
+            self._update_graphics_selection()
+            # TODO: Add undo/redo
+            return True
 
         if self.dispatch('on_key_down', window, keycode, text, modifiers):
             return True
@@ -558,6 +598,18 @@ class CodeEditor(CodeInput, FocusBehavior):
         return ret
 
     cursor = AliasProperty(_get_cursor, _set_cursor)
+
+    def on_size(self, instance, value):
+        self._trigger_refresh_text()
+        self._refresh_hint_text()
+        cursor = self.cursor
+        padding_left = self.padding[0]
+        padding_right = self.padding[2]
+        viewport_width = self.width - padding_left - padding_right
+        sx = self.scroll_x
+        offset = self.cursor_offset()
+        if offset < viewport_width + sx - 25:
+            self.scroll_x = max(0, offset - viewport_width + 25)
 
     def on_double_tap(self):
         # last_identifier = re.compile(r'(\w+)(?!.*\w.*)')
@@ -1094,6 +1146,12 @@ def update(dt):
         if exists('source.py'):
             with open('source.py') as f:
                 self.code = f.read()
+            def _reset_cursor(*t):
+                self.code_editor.cursor = 0, 0
+            Clock.schedule_once(_reset_cursor, 0)
+                # self.code_editor.scroll_x = 0
+                # self.code_editor.scroll_y = 0
+                # self.code_editor.cursor = 0, 0
 
         # FIXME
         vs1.bind(value=_set_var)
