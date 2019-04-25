@@ -42,7 +42,7 @@ from kivy.graphics.transformation import Matrix
 from kivy.graphics.context_instructions import Rotate, Translate, Scale, MatrixInstruction, Transform as KvTransform
 from kivy.properties import StringProperty, NumericProperty, \
         ListProperty, ObjectProperty, BooleanProperty, \
-        OptionProperty, DictProperty
+        OptionProperty, DictProperty, AliasProperty
 from kivy.clock import Clock
 from kivy.cache import Cache
 from kivy.utils import escape_markup
@@ -78,7 +78,7 @@ F_UPDATE = 'update'
 F_ON_KEY_PRESS = 'on_key_press'
 F_ON_KEY_RELEASE = 'on_key_release'
 
-TRANSITION_TIME = 0.4
+TRANSITION_TIME = 0.4 # * 2
 TRANSITION_IN = 'in_back'
 TRANSITION_OUT = 'out_back'
 
@@ -454,13 +454,14 @@ class CodeEditor(CodeInput, FocusBehavior):
                             remove = spaces - indent * tab
                             new_text = line[remove:]
                             self._set_line_text(cr, new_text)
-                            if cr == cr_from: cc_from -= remove
-                            if cr == cr_to: cc_to -= remove
+                            if cr == cr_from: cc_from = max(0, cc_from - remove)
+                            if cr == cr_to: cc_to = max(0, cc_to - remove)
                 self._selection_from = self.cursor_index((cc_from, cr_from))
                 self._selection_to = self.cursor_index((cc_to, cr_to))
                 self._selection_finished = True
                 self._update_selection(True)
                 self._update_graphics_selection()
+                # TODO: Add undo/redo
                 return True
             elif not self._selection and before_cursor == '' and not modifiers:
                 self.insert_text(' ' * tab)
@@ -493,44 +494,33 @@ class CodeEditor(CodeInput, FocusBehavior):
                     # self.ac_state[2] = len(ac.complete)
                 return True
 
-        elif modifiers == ['alt'] and key_str in ['up', 'down', 'right', 'left']:
-            print(self._lines)
-            cc, cr = self.cursor
-            empty_line = self._lines[cr].strip() == ''
-            if empty_line:
-                cr -= 1
-            # if self._lines[cr].strip():
-            #     self.do_cursor_movement('cursor_end')
-            #     self.insert_text('\n')
-            #     cc, cr = self.cursor
-            # l1 = self._lines[:cr]
-            # l2 = self._lines[cr:]
-            # self._lines = l1 + [key_str+'()'] + l2
-
-            # self._selection_from = self._selection_to = self.cursor_index()
-            # self._selection = True
-            # self._selection_finished = False
-            space = ''
-            if cr >= 0:
-                prev_line = self._lines[cr]
-                m = R_TURN.match(prev_line)
-                if m:
-                    space, cmd, step = m.groups()
-                    if cmd == key_str:
-                        if step:
-                            step = str(int(step)+1)
-                        else:
-                            step = '2'
-                        self._set_line_text(cr, space + cmd + '(' + step + ')')
-                        # self._lines[cr-1] = space + cmd + '(' + step + ')'
-                        return True
-            key_str = space + key_str
-            if not empty_line:
-                self.do_cursor_movement('cursor_end')
-                key_str = '\n' + key_str
-            self.insert_text(f'{key_str}()')
-            # self.cursor = (cc, cr+1)
-            return True
+        # Sokoban
+        # elif modifiers == ['alt'] and key_str in ['up', 'down', 'right', 'left']:
+        #     print(self._lines)
+        #     cc, cr = self.cursor
+        #     empty_line = self._lines[cr].strip() == ''
+        #     if empty_line:
+        #         cr -= 1
+        #     space = ''
+        #     if cr >= 0:
+        #         prev_line = self._lines[cr]
+        #         m = R_TURN.match(prev_line)
+        #         if m:
+        #             space, cmd, step = m.groups()
+        #             if cmd == key_str:
+        #                 if step:
+        #                     step = str(int(step)+1)
+        #                 else:
+        #                     step = '2'
+        #                 self._set_line_text(cr, space + cmd + '(' + step + ')')
+        #                 # self._lines[cr-1] = space + cmd + '(' + step + ')'
+        #                 return True
+        #     key_str = space + key_str
+        #     if not empty_line:
+        #         self.do_cursor_movement('cursor_end')
+        #         key_str = '\n' + key_str
+        #     self.insert_text(f'{key_str}()')
+        #     return True
 
         if self.dispatch('on_key_down', window, keycode, text, modifiers):
             return True
@@ -538,6 +528,36 @@ class CodeEditor(CodeInput, FocusBehavior):
         self.ac_begin = False
         return super(CodeInput, self).keyboard_on_key_down(
             window, keycode, text, modifiers)
+
+    def do_cursor_movement(self, action, control=False, alt=False):
+        if action == 'cursor_home' and not control:
+            cc, cr = self.cursor
+            _lines = self._lines
+            text = _lines[cr]
+            indent = len(text) - len(text.lstrip())
+            if cc != indent:
+                self.cursor = (indent, cr)
+                return
+        super(CodeInput, self).do_cursor_movement(action, control, alt)
+
+    def _get_cursor(self):
+        return self._cursor
+
+    def _set_cursor(self, pos):
+        ret = super(CodeInput, self)._set_cursor(pos)
+        cursor = self.cursor
+        padding_left = self.padding[0]
+        padding_right = self.padding[2]
+        viewport_width = self.width - padding_left - padding_right
+        sx = self.scroll_x
+        offset = self.cursor_offset()
+        if offset > viewport_width + sx - 25:
+            self.scroll_x = offset - viewport_width + 25
+        if offset < min(sx + 25, viewport_width):
+            self.scroll_x = offset + 25
+        return ret
+
+    cursor = AliasProperty(_get_cursor, _set_cursor)
 
     def on_double_tap(self):
         # last_identifier = re.compile(r'(\w+)(?!.*\w.*)')
@@ -1064,7 +1084,7 @@ def update(dt):
 
         #@debounce(0.2)
         def _set_var(wid, value):
-            self.sandbox.transition_time = 0.2
+            self.sandbox.transition_time = TRANSITION_TIME / 2 #0.2
             self.sandbox.transition_in = 'in_cubic'
             self.sandbox.transition_out = 'out_cubic'
             self.vars[wid.var_name] = value
@@ -1278,7 +1298,9 @@ def update(dt):
                             image_fill.bind(texture=update_texture)
                             # TODO: If not exists (image_stroke.texture is None)...
                         texture_fill = image_fill.texture
-                        tex_coords_fill = texture_fill.tex_coords
+                        if texture_fill is not None:
+                            tex_coords_fill = texture_fill.tex_coords
+                            # TODO: Mark figure.
                     else:
                         # if not self._show_clipped and shape.fill.is_clipped:
                         #     continue
@@ -1366,9 +1388,14 @@ def update(dt):
                     # motion read better.
                 # mesh.vertices = vertices
                 if redraw and self.sandbox.transition_time > 0:
-                    Animation.cancel_all(mesh)
-                    Animation(vertices=vertices, t=self.sandbox.transition_out,
-                        duration=self.sandbox.transition_time).start(mesh)
+                    def _on_complete(*lt):
+                        if mesh is not None:
+                            mesh.vertices = vertices
+                    Animation.stop_all(mesh)
+                    anim = Animation(vertices=vertices, t=self.sandbox.transition_out,
+                        duration=self.sandbox.transition_time)
+                    anim.bind(on_complete=_on_complete)
+                    anim.start(mesh)
                 else:
                     mesh.vertices = vertices
 
@@ -1381,8 +1408,8 @@ def update(dt):
                 #     self.sandbox.shapes_by_id.pop(oid, None)
             # to_remove = set(old_render_shapes) - set(shape_ids)
             # old_shapes = {id(s[0][1][0]): (s[0][0], s[0][1][0]) for shape in self.sandbox.shapes_by_id.values()}
-            print('old_shapes', len(old_shapes))
-            print('new shapes', len([id(s[0][1][0]) for s in self.sandbox.shapes_by_id.values()]))
+            # print('old_shapes', len(old_shapes))
+            # print('new shapes', len([id(s[0][1][0]) for s in self.sandbox.shapes_by_id.values()]))
             # to_remove = set(old_shapes) - set([id(s[0][1][0]) for s in self.sandbox.shapes_by_id.values()])
             to_remove = old_shapes - set([shape for shape in self.sandbox.shapes_by_id.values()])
 
@@ -1396,7 +1423,7 @@ def update(dt):
                 for shape in to_remove:
                     for context, instructions in shape:
                         for mesh in instructions:
-                            Animation.cancel_all(mesh)
+                            Animation.stop_all(mesh)
                             vertices = mesh.vertices
                             v_len = len(vertices) // 4
                             # Set initial size to 0, 0
@@ -1409,8 +1436,8 @@ def update(dt):
 
             # print('old_render_shapes', len(list(old_shapes)))
             # print('self.sandbox.shapes_by_id.values()', len(self.sandbox.shapes_by_id.values()))
-            print('to_remove', len(to_remove))
-            print('self.sandbox.shapes_by_trace AFTER', len(self.sandbox.shapes_by_trace))
+            # print('to_remove', len(to_remove))
+            # print('self.sandbox.shapes_by_trace AFTER', len(self.sandbox.shapes_by_trace))
 
             # for oid in to_remove:
                 # self.sandbox.shapes_by_id.pop(oid, None)
@@ -1602,6 +1629,8 @@ def update(dt):
                         and not (self.update_schedule and self.update_schedule.is_triggered):
                     if self.update_schedule is not None:
                         self.update_schedule.cancel()
+                    if self.trigger_exec_update:
+                        self.trigger_exec_update.cancel()
                     self.update_schedule()
             except Exception as e:
                 print('E3:', e)
@@ -1612,6 +1641,8 @@ def update(dt):
         self.status = ('EXEC',)
         if self.update_schedule:
             self.update_schedule.cancel()
+        if self.trigger_exec_update:
+            self.trigger_exec_update.cancel()
         self._gravity = Vector(0, 0)
         self._show_clipped = True
         self.runner.reset(globals=self.vars)
@@ -1645,7 +1676,7 @@ def update(dt):
         self.sandbox.space.sleep_time_threshold = 3.0
         self.sandbox.space.replay_mode = False
         for widget in saved:
-            # print('SAVED:', widget)
+            print('SAVED:', widget)
             self.sandbox.add_widget(widget)
         self.sandbox.canvas.add(self.sandbox.rc1)
         self.sandbox.canvas.add(self.sandbox.rc2)
@@ -1672,9 +1703,9 @@ def update(dt):
         #     line.friction = 0.9
         # self.sandbox.space.add(static_lines)
 
-        seed(123)
         ok = False
         start = process_time()
+        seed(0)
         try:
             ok = self.runner.execute()
         except Exception as e:
@@ -1753,14 +1784,14 @@ def update(dt):
             self.code_editor.highlight_line(None)
             if F_UPDATE in self.runner.globals:
                 self._last_update_time = time()
-            self.update_sandbox()
+            # self.update_sandbox()
+            Clock.schedule_once(lambda _: self.update_sandbox(), 0)
             # if self.sokoban and self.sokoban.boxes_remaining == 0:
             #     print('Level completed:', self.sokoban.level)
             #     self.sokoban.level += 1
             #     self.sandbox.clear_widgets()
             if F_UPDATE in self.runner.globals:  # and (not self.update_schedule or not self.update_schedule.is_triggered):
                 # self.sandbox.transition_time = 0
-
                 def run_update(*t):
                     self.update_schedule = Clock.schedule_interval(self.trigger_exec_update, 1.0 / 60.0)
                 self.update_schedule = Clock.schedule_once(run_update, self.sandbox.transition_time)
@@ -1804,6 +1835,8 @@ def update(dt):
             print_exc()
             if self.update_schedule:
                 self.update_schedule.cancel()
+            if self.trigger_exec_update:
+                self.trigger_exec_update.cancel()
             watches = ''
             for v, t, r in whos(self.runner.globals):
                 watches += f'{v}\t{t}\t{r}\n'
