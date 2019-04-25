@@ -56,7 +56,7 @@ from kivy.animation import Animation
 import pymunk
 
 from ourturtle import Turtle
-from sprite import Sprite, OurImage, Vector
+from sprite import Sprite
 from codean import autocomp, CodeRunner, Break, COMMON_CODE
 from sokoban.sokoban import Sokoban
 
@@ -522,6 +522,7 @@ class CodeEditor(CodeInput, FocusBehavior):
         #         key_str = '\n' + key_str
         #     self.insert_text(f'{key_str}()')
         #     return True
+        # Comment line or selection by Ctrl-/
         elif key == 47 and modifiers == ['ctrl']:
             cc, cr = self.cursor
             _lines = self._lines
@@ -1353,7 +1354,7 @@ def update(dt):
                                 anim_delay=shape.fill.anim_delay)
                             self.sandbox.images[source] = image_fill
                             # self.sandbox.images[shape.fill.source] = image
-                            image_fill.bind(texture=update_texture)
+                            # image_fill.bind(texture=update_texture)
                             # TODO: If not exists (image_stroke.texture is None)...
                         texture_fill = image_fill.texture
                         if texture_fill is not None:
@@ -1413,9 +1414,10 @@ def update(dt):
                 ))
 
 
+                BindTexture(texture=texture_stroke, index=1)
                 if render_shape is None:  # id(shape) not in self.sandbox.shapes:
                     with render_context:
-                        BindTexture(texture=texture_stroke, index=1)
+                        # BindTexture(texture=texture_stroke, index=1)
                         if redraw and self.sandbox.transition_time > 0:
                             v_len = len(vertices) // 4
                             # Set initial size to 0, 0
@@ -1432,6 +1434,7 @@ def update(dt):
                         self.sandbox.image_meshes[image_fill.source].append(mesh)
                 else:
                     mesh = render_shape[0][1][0]
+                    mesh.texture = texture_fill
                 # else:
                     # self.sandbox.shapes[id(shape)][0].vertices = vertices
 
@@ -1445,6 +1448,7 @@ def update(dt):
                     # 250-300ms. For transitions that bounce or are elastic, 400-500ms lets the
                     # motion read better.
                 # mesh.vertices = vertices
+
                 if redraw and self.sandbox.transition_time > 0:
                     def _on_complete(*lt):
                         if mesh is not None:
@@ -1685,13 +1689,14 @@ def update(dt):
             try:
                 if self.runner.execute(changed) and F_UPDATE in self.runner.globals \
                         and not (self.update_schedule and self.update_schedule.is_triggered):
-                    if self.update_schedule is not None:
-                        self.update_schedule.cancel()
                     if self.trigger_exec_update:
                         self.trigger_exec_update.cancel()
-                    self.update_schedule()
+                    if self.update_schedule is not None:
+                        self.update_schedule.cancel()
+                        self.update_schedule()
             except Exception as e:
                 print('E3:', e)
+                print_exc()
                 self.status = ('ERROR', None)
 
     def execute_code(self, *largs):

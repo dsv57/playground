@@ -186,7 +186,7 @@ class VarLister(ast.NodeVisitor):
 
 class CodeRunner:
 
-    def __init__(self, source=None, name='<code-input>', globals={},
+    def __init__(self, source=None, name='<code-input>', globals=None,
                  special_funcs=None):
         self._name = name
         self._special_funcs = special_funcs or []
@@ -196,13 +196,13 @@ class CodeRunner:
         self._globals = {}
         self._breakpoint = None
         self.default_globals = {'Break': Break}
-        self.default_globals.update(globals)
+        self.default_globals.update(globals or {})
         self.text_stream = StringIO()
         self.reset(source)
 
-    def reset(self, source=None, globals={}):
+    def reset(self, source=None, globals=None):
         self.exception = None
-        self.set_globals(globals, False)
+        self.set_globals(globals or {}, False)
         self.text_stream.close()
         self.text_stream = StringIO()
         if source:
@@ -315,6 +315,7 @@ class CodeRunner:
         tree.body = new_body
         if not compare_ast(self._ast.get(COMMON_CODE, None), tree):
             changed = [COMMON_CODE] + changed  # Preserving order: common first.
+            self._codeobjs = {}  # Clear compiled code
         new_ast[COMMON_CODE] = tree
         self._ast = new_ast
 
@@ -338,6 +339,8 @@ class CodeRunner:
         self.exception = None
         if parts is None:  # Preserving order: common first.
             parts = [COMMON_CODE] + list(set(cobjs.keys()) - set([COMMON_CODE]))
+        # if COMMON_CODE in parts:
+
         for p in parts:
             print('exec', p)
             try:

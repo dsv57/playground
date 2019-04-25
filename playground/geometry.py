@@ -541,8 +541,10 @@ class VectorRef(Vector):
     def rotate(self, angle):
         c = cos(radians(angle))
         s = sin(radians(angle))
-        length = self.length
-        self._fset(length * c, length * s)
+        x, y = self._fget()
+        new_x = x * c - y * s
+        new_y = x * s + y * c
+        self._fset(new_x, new_y)
 
     def rotated(self, angle):
         v = Vector(self)
@@ -592,10 +594,10 @@ class VectorRef(Vector):
     @angle.setter
     def angle(self, angle):
         x, y = self._fget()
-        length = hypot(x,y)
-        self.x = self.length
-        self.y = 0
-        self.rotate(angle)
+        length = hypot(x, y)
+        x = length * cos(radians(angle))
+        y = length * sin(radians(angle))
+        self._fset(x, y)
 
     def angle_between(self, other):
         """Get the angle between the vector and the other in radians
