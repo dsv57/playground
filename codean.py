@@ -315,9 +315,12 @@ class CodeRunner:
         tree.body = new_body
         if not compare_ast(self._ast.get(COMMON_CODE, None), tree):
             changed = [COMMON_CODE] + changed  # Preserving order: common first.
-            self._codeobjs = {}  # Clear compiled code
+            # self._codeobjs = {}  # Clear compiled code
+            # self.compile([COMMON_CODE])
         new_ast[COMMON_CODE] = tree
         self._ast = new_ast
+
+        self.compile(changed)
 
         vl = VarLister()
         vl.visit(tree)
@@ -329,7 +332,9 @@ class CodeRunner:
         codeobjs = self._codeobjs
         if parts is None:
             parts = self._ast.keys()
+        print('COMPILE:', parts)
         for p in parts:
+            codeobjs.pop(p, None)
             codeobjs[p] = compile(self._ast[p], self._name, 'exec', **kvargs)
 
     def execute(self, parts=None):
@@ -338,11 +343,14 @@ class CodeRunner:
         cobjs = self._codeobjs
         self.exception = None
         if parts is None:  # Preserving order: common first.
-            parts = [COMMON_CODE] + list(set(cobjs.keys()) - set([COMMON_CODE]))
+            parts = [COMMON_CODE] + list(set(self._ast.keys()) - set([COMMON_CODE]))
         # if COMMON_CODE in parts:
+        print('EXECUTE', parts)
 
         for p in parts:
             print('exec', p)
+            if p not in cobjs:
+                self.compile(p)
             try:
                 with redirect_stdout(self.text_stream):
                     with redirect_stderr(self.text_stream):

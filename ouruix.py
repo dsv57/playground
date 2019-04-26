@@ -208,6 +208,7 @@ def debounce(wait):
 
 def whos(vars, max_repr=40):
     w_types = (int, float, str, list, dict, tuple)
+    w_types += (OurColor, Stroke, Physics, Shape, Circle, Rectangle, KeepRefs, OurImage, Vector, VectorRef, Transform)
     def w_repr(v):
         r = repr(v)
         return r if len(r) < max_repr else r[:max_repr-3] + '...'
@@ -756,10 +757,11 @@ class OurSandbox(FocusBehavior, ScatterPlane):
         self.shapes_by_id = dict()
         self.images = defaultdict(list)
         self.image_meshes = defaultdict(list)
+        self.code = []  # Store code for diffing scene
 
         self.transition_time = TRANSITION_TIME
 
-        Clock.schedule_interval(self.update_shader, 1 / 60.)
+        # Clock.schedule_interval(self.update_shader, 1 / 60.)
         glEnable(GL_VERTEX_PROGRAM_POINT_SIZE)
 
         self.register_event_type('on_key_down')
@@ -1253,15 +1255,34 @@ def update(dt):
             pass
 
     def update_sandbox(self, redraw=True):
+        from difflib import SequenceMatcher
         # redraw = True
+        matcher_opcodes = None
         indices = [0, 3, 1, 2] #[0,3,1,2] #[0, 1, 3, 2]
         # [u, v, u + w, v, u + w, v + h, u, v + h]
         tex_coords_fill = tex_coords_stroke = 0.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0
         # print('self.sandbox.shapes_by_trace', self.sandbox.shapes_by_trace)
         def update_texture(image, texture):
             # print("Hi!", self.sandbox.images, image.source)
-            for mesh in self.sandbox.image_meshes[image.source]:
-                mesh.texture = texture
+            if image.source in self.sandbox.image_meshes:
+                for mesh in self.sandbox.image_meshes[image.source]:
+                    mesh.texture = texture
+            else:
+                print('DEL', image, image.source)
+                del image
+        def match_lines(lines):
+            match = []
+            for lineno in lines:
+                lineno -= 1
+                for tag, i1, i2, j1, j2 in matcher_opcodes:
+                    if i1 <= lineno < i2:
+                        if tag in ('equal', 'replace'):
+                            match.append(1 + lineno + j1 - i1)
+                        else:
+                            match.append(-1)
+                        break
+            return tuple(match)
+
         try:
             t1 = process_time()
             _global_update_colors()
@@ -1278,6 +1299,14 @@ def update(dt):
             if redraw:
                 Shape._trace_counters.clear()
                 self.sandbox.shapes_by_id = dict()
+                self.sandbox.images = defaultdict(list)
+                self.sandbox.image_meshes = defaultdict(list)
+
+                old_code = self.sandbox.code
+                new_code = self.code.splitlines()
+                matcher = SequenceMatcher(lambda x: x in ' \t', new_code, old_code)
+                matcher_opcodes = matcher.get_opcodes()
+                self.sandbox.code = new_code
             # else:
             #     self.sandbox.shapes_by_trace = dict()
             # if redraw:
@@ -1305,7 +1334,11 @@ def update(dt):
 
                 if redraw:
                     if shape_trace is not None:
-                        render_shape = self.sandbox.shapes_by_trace.get(shape_trace)
+                        print('shape_trace', shape_trace)
+                        print('shape_trace matched:', match_lines(shape_trace[0]))
+                        mathed_trace = match_lines(shape_trace[0]), shape_trace[1]
+                        print('self.sandbox.shapes_by_trace.keys()', self.sandbox.shapes_by_trace.keys())
+                        render_shape = self.sandbox.shapes_by_trace.get(mathed_trace)
                         self.sandbox.shapes_by_id[id(shape)] = render_shape
                 else:
                     render_shape = self.sandbox.shapes_by_id.get(id(shape))
@@ -1334,7 +1367,7 @@ def update(dt):
                                 anim_delay=shape.stroke.fill.anim_delay)
                             self.sandbox.images[source] = image_stroke
                             # self.sandbox.images[shape.fill.source] = image
-                            # image.bind(texture=update_texture) # TODO: Animation
+                            image.bind(texture=update_texture) # TODO: Animation
                             # TODO: If not exists (image_stroke.texture is None)...
                         texture_stroke = image_stroke.texture
                         tex_coords_stroke = texture_stroke.tex_coords
@@ -1413,8 +1446,8 @@ def update(dt):
                     indices, 'triangle_strip', (image_fill,)
                 ))
 
-
-                BindTexture(texture=texture_stroke, index=1)
+                with render_context:
+                    BindTexture(texture=texture_stroke, index=1)
                 if render_shape is None:  # id(shape) not in self.sandbox.shapes:
                     with render_context:
                         # BindTexture(texture=texture_stroke, index=1)
@@ -1428,13 +1461,15 @@ def update(dt):
                             fmt=vfmt, mode='triangle_strip', vertices=initial_vs,
                             indices=indices, texture=texture_fill)
                     self.sandbox.shapes_by_id[id(shape)] = ((render_context, (mesh, )), )
-                    if shape_trace:
-                        self.sandbox.shapes_by_trace[shape_trace] = ((render_context, (mesh, )), )
                     if image_fill is not None:
                         self.sandbox.image_meshes[image_fill.source].append(mesh)
                 else:
                     mesh = render_shape[0][1][0]
                     mesh.texture = texture_fill
+
+                if shape_trace:
+                    self.sandbox.shapes_by_trace[shape_trace] = ((render_context, (mesh, )), )
+
                 # else:
                     # self.sandbox.shapes[id(shape)][0].vertices = vertices
 
@@ -1647,6 +1682,7 @@ def update(dt):
         # except KeyError as e:
         #     print('update_sandbox:', e)
         # Reset transition time
+        self.sandbox.update_shader()
         self.sandbox.transition_time = TRANSITION_TIME
         self.sandbox.transition_in = TRANSITION_IN
         self.sandbox.transition_out = TRANSITION_OUT
@@ -1669,9 +1705,10 @@ def update(dt):
             if COMMON_CODE in changed:
                 self.runner.reset()
 
-            self.runner.compile(changed)
+            # self.runner.compile() # changed) FIXME
         except Exception as e:
             print('E:', e)
+            print_exc()
             print('* ' * 40)
             line_num = self.runner.exception_lineno(e)
             self.code_editor.highlight_line(None, 'run')
@@ -1778,7 +1815,8 @@ def update(dt):
 
         watches = ''
         for v, t, r in whos(self.runner.globals):
-            watches += f'{v + " " * (8 - len(v))} {t + " " * (5 - len(t))}  {r}\n'
+            watches += f'{v + " " * (8 - len(v))}  {r}\n'
+            # watches += f'{v + " " * (8 - len(v))} {t + " " * (5 - len(t))}  {r}\n'
 
         if False: # ok and F_UPDATE in self.runner.globals and self.prev_step > 0:
             # print('Replay:', prev_step)
@@ -1832,7 +1870,8 @@ def update(dt):
                     if watched_locals:
                         watches += f'== {name} ==\n'
                         for v, t, r in watched_locals:
-                            watches += f'{v}\t{t}\t{r}\n'
+                            watches += f'{v + " " * (8 - len(v))}  {r}\n'
+                            # watches += f'{v}\t{t}\t{r}\n'
                         self.code_editor.highlight_line(lineno, hl_style, add=True)
                         # print('LINES +', lineno, self.code_editor._highlight)
 
@@ -1902,7 +1941,8 @@ def update(dt):
                 self.trigger_exec_update.cancel()
             watches = ''
             for v, t, r in whos(self.runner.globals):
-                watches += f'{v}\t{t}\t{r}\n'
+                # watches += f'{v}\t{t}\t{r}\n'
+                watches += f'{v + " " * (8 - len(v))}  {r}\n'
             if self.runner.exception:
                 exc, exc_str, traceback = self.runner.exception
             else:
@@ -1933,7 +1973,8 @@ def update(dt):
                         if watched_locals:
                             watches += f'== {name} ==\n'
                             for v, t, r in watched_locals:
-                                watches += f'{v}\t{t}\t{r}\n'
+                                # watches += f'{v}\t{t}\t{r}\n'
+                                watches += f'{v + " " * (8 - len(v))}  {r}\n'
                     self.code_editor.highlight_line(lineno, hl_style, add=True)
             self.watches = watches
         else:
