@@ -49,7 +49,7 @@ from kivy.utils import escape_markup
 from kivy.core.text.markup import MarkupLabel
 from kivy.core.window import Window # request keyboard
 from kivy.graphics.opengl import glEnable, glDisable, glFinish
-from kivy.resources import resource_find
+from kivy.resources import resource_find, resource_paths
 # from kivy.graphics.fbo import Fbo
 from kivy.animation import Animation
 
@@ -60,6 +60,7 @@ from sprite import Sprite
 from codean import autocomp, CodeRunner, Break, COMMON_CODE
 from sokoban.sokoban import Sokoban
 
+from playground import utils
 from playground.color import _srgb_to_linear, _parse_srgb, _global_update_colors, Color as OurColor
 from playground.shapes import Stroke, Physics, Shape, Circle, Rectangle, KeepRefs, Image as OurImage
 from playground.geometry import Vector, VectorRef, Transform
@@ -78,13 +79,17 @@ F_UPDATE = 'update'
 F_ON_KEY_PRESS = 'on_key_press'
 F_ON_KEY_RELEASE = 'on_key_release'
 
+FPS = 60
+
 TRANSITION_TIME = 0.4 # * 2
 TRANSITION_IN = 'in_back'
 TRANSITION_OUT = 'out_back'
 
 R_TURN = re.compile(r'^(\s*)(right|left|up|down)\(([0-9]*)\)$')
 
-grace_hopper = Image(source='grace_hopper.jpg', mipmap=True, anim_delay=0.04166) #, keep_data=True)
+utils.resource_paths = resource_paths
+
+# grace_hopper = Image(source='grace_hopper.jpg', mipmap=True, anim_delay=0.04166) #, keep_data=True)
 # print(grace_hopper, grace_hopper.texture, grace_hopper.texture.tex_coords, grace_hopper.texture.uvpos, grace_hopper.texture.uvsize)
 # grace_hopper.texture.blit_buffer(pbuffer=_srgba_bytes_to_linear(grace_hopper.texture.pixels), colorfmt='rgba')
 # print(grace_hopper.texture.pixels)
@@ -922,6 +927,7 @@ class OurSandbox(FocusBehavior, ScatterPlane):
                 Matrix().scale(rescale, rescale, rescale),
                 post_multiply=True,
                 anchor=self.to_local(*touch.pos))
+            self.update_shader()
             return self.dispatch('on_transform_with_touch', touch)
         return super().on_touch_down(touch)
 
@@ -1258,7 +1264,7 @@ def update(dt):
         from difflib import SequenceMatcher
         # redraw = True
         matcher_opcodes = None
-        indices = [0, 3, 1, 2] #[0,3,1,2] #[0, 1, 3, 2]
+        indices = [0, 1, 2, 3] #[1, 2, 0, 3] # [0, 3, 1, 2] #[0,3,1,2] #[0, 1, 3, 2]
         # [u, v, u + w, v, u + w, v + h, u, v + h]
         tex_coords_fill = tex_coords_stroke = 0.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0
         # print('self.sandbox.shapes_by_trace', self.sandbox.shapes_by_trace)
@@ -1391,6 +1397,20 @@ def update(dt):
                             # TODO: If not exists (image_stroke.texture is None)...
                         texture_fill = image_fill.texture
                         if texture_fill is not None:
+                            # texture_fill = texture_fill.get_region(0,0,186,186)
+                            shape_width, shape_height = shape.size
+                            shape_ratio = shape_width / shape_height
+                            texture_width, texture_height = texture_fill.size
+                            texture_ratio = texture_width / texture_height
+                            if shape_ratio != texture_ratio:
+                                if shape_ratio > texture_ratio:
+                                    texture_height = texture_width / shape_ratio
+                                else:
+                                    texture_width = texture_height * shape_ratio
+                                texture_x = (texture_fill.width - texture_width) / 2
+                                texture_y = (texture_fill.height - texture_height) / 2
+                                # print('TEX', texture_x, texture_y, texture_width, texture_height)
+                                texture_fill = texture_fill.get_region(texture_x, texture_y, texture_width, texture_height)
                             tex_coords_fill = texture_fill.tex_coords
                             # TODO: Mark figure.
                     else:
@@ -1418,10 +1438,10 @@ def update(dt):
                     a1 = radians(shape.angle_start)
                     a2 = radians(shape.angle_end)
                     v_attrs = x, y, w, *stroke, *fill, a1, a2, *tr
-                    v0 = +a, -b, *v_attrs, *tex_coords_fill[0:2], *tex_coords_stroke[0:2]
-                    v1 = -a, -b, *v_attrs, *tex_coords_fill[2:4], *tex_coords_stroke[2:4]
-                    v2 = -a, +b, *v_attrs, *tex_coords_fill[4:6], *tex_coords_stroke[4:6]
-                    v3 = +a, +b, *v_attrs, *tex_coords_fill[6:8], *tex_coords_stroke[6:8]
+                    v0 = -a, -b, *v_attrs, *tex_coords_fill[0:2], *tex_coords_stroke[0:2]
+                    v1 = -a, +b, *v_attrs, *tex_coords_fill[6:8], *tex_coords_stroke[6:8]
+                    v2 = +a, -b, *v_attrs, *tex_coords_fill[2:4], *tex_coords_stroke[2:4]
+                    v3 = +a, +b, *v_attrs, *tex_coords_fill[4:6], *tex_coords_stroke[4:6]
                     vertices = v0 + v1 + v2 + v3
 
                 elif isinstance(shape, Rectangle):
@@ -1432,10 +1452,10 @@ def update(dt):
                     a, b = shape.size
                     r = shape.radius
                     v_attrs = x, y, r, w, *stroke, *fill, *tr
-                    v0 = +a, -b, *v_attrs, *tex_coords_fill[0:2], *tex_coords_stroke[0:2]
-                    v1 = -a, -b, *v_attrs, *tex_coords_fill[2:4], *tex_coords_stroke[2:4]
-                    v2 = -a, +b, *v_attrs, *tex_coords_fill[4:6], *tex_coords_stroke[4:6]
-                    v3 = +a, +b, *v_attrs, *tex_coords_fill[6:8], *tex_coords_stroke[6:8]
+                    v0 = -a, -b, *v_attrs, *tex_coords_fill[0:2], *tex_coords_stroke[0:2]
+                    v1 = -a, +b, *v_attrs, *tex_coords_fill[6:8], *tex_coords_stroke[6:8]
+                    v2 = +a, -b, *v_attrs, *tex_coords_fill[2:4], *tex_coords_stroke[2:4]
+                    v3 = +a, +b, *v_attrs, *tex_coords_fill[4:6], *tex_coords_stroke[4:6]
                     vertices = v0 + v1 + v2 + v3
 
                 else:
@@ -1527,7 +1547,7 @@ def update(dt):
                             initial_vs = tuple(0 if i % v_len in (0, 1) else v for i, v in enumerate(vertices))
                             Animation(vertices=initial_vs, t=self.sandbox.transition_in,
                                 duration=self.sandbox.transition_time).start(mesh)
-                Clock.schedule_once(lambda _:  remove_garbage(to_remove), self.sandbox.transition_time + 1 / 60.)
+                Clock.schedule_once(lambda _:  remove_garbage(to_remove), self.sandbox.transition_time + 1 / FPS)
             else:
                 remove_garbage(to_remove)
 
@@ -1895,7 +1915,7 @@ def update(dt):
             if F_UPDATE in self.runner.globals:  # and (not self.update_schedule or not self.update_schedule.is_triggered):
                 # self.sandbox.transition_time = 0
                 def run_update(*t):
-                    self.update_schedule = Clock.schedule_interval(self.trigger_exec_update, 1.0 / 60.0)
+                    self.update_schedule = Clock.schedule_interval(self.trigger_exec_update, 1 / FPS)
                 self.update_schedule = Clock.schedule_once(run_update, self.sandbox.transition_time)
 
         self.watches = watches
@@ -1979,8 +1999,8 @@ def update(dt):
             self.watches = watches
         else:
             self._last_update_time = now
-            self.sandbox.space.step(1. / 60.)
-            self.sandbox.space.step(1. / 60.)
+            self.sandbox.space.step(1 / FPS / 2)
+            self.sandbox.space.step(1 / FPS / 2)
             if not replay:
                 Sprite.update_from_pymunk()
                 self.update_sandbox(False)

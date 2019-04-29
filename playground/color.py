@@ -13,19 +13,7 @@ from colorio.illuminants import whitepoints_cie1931
 
 from named_colors import COLORS
 
-from itertools import chain
-from weakref import WeakValueDictionary
-class KeepWeakRefs(object):
-    __refs__ = defaultdict(WeakValueDictionary)
-    def __init__(self):
-        self.__refs__[self.__class__][id(self)] = self
-
-    @classmethod
-    def get_instances(cls, subclasses=False):
-        refs = cls.__refs__
-        if subclasses:
-            return chain.from_iterable(refs[c].values() for c in refs if issubclass(c, cls))
-        return refs[cls].values()
+from playground.utils import KeepWeakRefs
 
 
 _dims = {
