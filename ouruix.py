@@ -64,7 +64,7 @@ from rougier.dash_lines_2D import DashLines
 
 from playground import utils
 from playground.color import _srgb_to_linear, _parse_srgb, _global_update_colors, Color as OurColor
-from playground.shapes import Stroke, Physics, Shape, Circle, Rectangle, KeepRefs, Image as OurImage
+from playground.shapes import Stroke, Physics, Shape, Circle, Rectangle, KeepRefs, Image as OurImage, Line as OurLine
 from playground.geometry import Vector, VectorRef, Transform
 
 try:
@@ -727,35 +727,27 @@ class OurSandbox(FocusBehavior, ScatterPlane):
 
         self.dls = DashLines()
         self.rc3 = self.dls.context
-        import numpy as np
-        lw = 20
-        x0,y0 = 500.0, 500.0
-        coils = 3 #12
-        rho_max = 450.
-        theta_max = coils * 2 * np.pi
-        rho_step = rho_max / theta_max
+        # lw = 20
+        # x0,y0 = 500.0, 500.0
+        # coils = 3 #12
+        # rho_max = 450.
+        # theta_max = coils * 2 * pi
+        # rho_step = rho_max / theta_max
 
-        P=[]
-        chord = 1
-        theta = 1 + chord / rho_step
-        while theta <= theta_max:
-            rho = rho_step * theta
-            x = rho * np.cos( theta )
-            y = rho * np.sin( theta )
-            P.append( (x,y) )
-            theta += chord / rho
-            chord += .05
+        # P=[]
+        # chord = 1
+        # theta = 1 + chord / rho_step
+        # while theta <= theta_max:
+        #     rho = rho_step * theta
+        #     x = rho * cos( theta )
+        #     y = rho * sin( theta )
+        #     P.append( (x,y) )
+        #     theta += chord / rho
+        #     chord += .05
 
-        self.dls.append(P, translate=(x0,y0),
-                          color=(1,0,0,1), linewidth=lw+2, dash_pattern = 'solid')
-        self.dls.set_uniforms({
-            'modelview_mat': self.transform,
-            'resolution': list(map(float, self.size)),
-            'scale': self.transform[0]
-        })
-        self.dls.draw()
-
-
+        # self.dls.append(P, translate=(x0,y0),
+        #                   color=(1,0,0,1), linewidth=lw+2, dash_pattern = 'solid')
+        # self.dls.draw()
 
         # x, y, w, *stroke, *fill, a1, a2, *tr
         self.rc1_vfmt = (
@@ -1307,7 +1299,7 @@ def update(dt):
         from difflib import SequenceMatcher
         # redraw = True
         matcher_opcodes = None
-        indices = [0, 1, 2, 3] #[1, 2, 0, 3] # [0, 3, 1, 2] #[0,3,1,2] #[0, 1, 3, 2]
+        # indices = [0, 1, 2, 3] #[1, 2, 0, 3] # [0, 3, 1, 2] #[0,3,1,2] #[0, 1, 3, 2]
         # [u, v, u + w, v, u + w, v + h, u, v + h]
         tex_coords_fill = tex_coords_stroke = 0.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0
         # print('self.sandbox.shapes_by_trace', self.sandbox.shapes_by_trace)
@@ -1316,9 +1308,9 @@ def update(dt):
             if image.source in self.sandbox.image_meshes:
                 for mesh in self.sandbox.image_meshes[image.source]:
                     mesh.texture = texture
-            else:
-                print('DEL', image, image.source)
-                del image
+            # else:
+            #     print('DEL', image, image.source)
+            #     del image
         def match_lines(lines):
             match = []
             for lineno in lines:
@@ -1356,26 +1348,9 @@ def update(dt):
                 matcher = SequenceMatcher(lambda x: x in ' \t', new_code, old_code)
                 matcher_opcodes = matcher.get_opcodes()
                 self.sandbox.code = new_code
-            # else:
-            #     self.sandbox.shapes_by_trace = dict()
-            # if redraw:
-            #     self.sandbox.shapes_by_id = dict()
-            #     self.sandbox.images = defaultdict(list)
-            #     self.sandbox.image_meshes = defaultdict(list)
-            # with:
-                # if redraw:
-                #     self.ellipses = self.sandbox.make_ellipses()
+
             for shape in Shape.get_instances(True):
-                # print(shape, shape._trace, shape._trace_iter)
-                # textured = shape.fill is not None and isinstance(shape.fill, OurImage)
-                # if textured and not redraw and id(shape) in self.sandbox.shapes and \
-                #         shape.fill.source in self.sandbox.images:
-                #     image = self.sandbox.images[shape.fill.source]
-                #     if image.anim_available:
-                #         print('Update texture!')
-                #         self.sandbox.shapes[id(shape)][0].texture = image.texture
                 shape_ids.append(id(shape))
-                # self.sandbox.rendered_shapes.append(shape)
                 render_shape = None #if redraw else self.sandbox.shapes_by_id.get(id(shape))
                 shape_trace = (shape._trace, shape._trace_iter) if shape._trace else None
                 if shape_trace is not None:
@@ -1383,10 +1358,10 @@ def update(dt):
 
                 if redraw:
                     if shape_trace is not None:
-                        print('shape_trace', shape_trace)
-                        print('shape_trace matched:', match_lines(shape_trace[0]))
+                        # print('shape_trace', shape_trace)
+                        # print('shape_trace matched:', match_lines(shape_trace[0]))
                         mathed_trace = match_lines(shape_trace[0]), shape_trace[1]
-                        print('self.sandbox.shapes_by_trace.keys()', self.sandbox.shapes_by_trace.keys())
+                        # print('self.sandbox.shapes_by_trace.keys()', self.sandbox.shapes_by_trace.keys())
                         render_shape = self.sandbox.shapes_by_trace.get(mathed_trace)
                         self.sandbox.shapes_by_id[id(shape)] = render_shape
                 else:
@@ -1401,10 +1376,11 @@ def update(dt):
                 image_stroke = None
                 texture_fill = None
                 texture_stroke = None
-                vertices = []
                 render_context = None
                 vfmt = None
                 mesh = None
+                vertices = []
+                indices = None
                 if shape.stroke is not None and shape.stroke.fill is not None:
                     if isinstance(shape.stroke.fill, OurImage):
                         stroke = 1, 1, 1, 1
@@ -1465,12 +1441,12 @@ def update(dt):
                     fill = *fill[:3], fill[3] * shape.opacity / 100
                 # if shape.fill and shape.fill.is_clipped:
                 #     print('Clipped!')
-                tr = 1, 0, 0, 1
+                tr = 1, 0, 0, 1, 0, 0
                 if shape.transform:
                     tr = tuple(shape.transform)
-                    x += tr[4]
-                    y += tr[5]
-                    tr = tr[:4]
+                    # x += tr[4]
+                    # y += tr[5]
+                    # tr = tr[:4]
 
                 if isinstance(shape, Circle):
                     render_context = self.sandbox.rc1
@@ -1480,12 +1456,13 @@ def update(dt):
                     a = b = shape.radius * 2
                     a1 = radians(shape.angle_start)
                     a2 = radians(shape.angle_end)
-                    v_attrs = x, y, w, *stroke, *fill, a1, a2, *tr
+                    v_attrs = x+tr[4], y+tr[5], w, *stroke, *fill, a1, a2, *tr[:4]
                     v0 = -a, -b, *v_attrs, *tex_coords_fill[0:2], *tex_coords_stroke[0:2]
                     v1 = -a, +b, *v_attrs, *tex_coords_fill[6:8], *tex_coords_stroke[6:8]
                     v2 = +a, -b, *v_attrs, *tex_coords_fill[2:4], *tex_coords_stroke[2:4]
                     v3 = +a, +b, *v_attrs, *tex_coords_fill[4:6], *tex_coords_stroke[4:6]
                     vertices = v0 + v1 + v2 + v3
+                    indices = [0, 1, 2, 3]
 
                 elif isinstance(shape, Rectangle):
                     render_context = self.sandbox.rc2
@@ -1494,12 +1471,24 @@ def update(dt):
                     x, y = shape.corner
                     a, b = shape.size
                     r = shape.radius
-                    v_attrs = x, y, r, w, *stroke, *fill, *tr
+                    v_attrs = x+tr[4], y+tr[5], r, w, *stroke, *fill, *tr[:4]
                     v0 = -a, -b, *v_attrs, *tex_coords_fill[0:2], *tex_coords_stroke[0:2]
                     v1 = -a, +b, *v_attrs, *tex_coords_fill[6:8], *tex_coords_stroke[6:8]
                     v2 = +a, -b, *v_attrs, *tex_coords_fill[2:4], *tex_coords_stroke[2:4]
                     v3 = +a, +b, *v_attrs, *tex_coords_fill[4:6], *tex_coords_stroke[4:6]
                     vertices = v0 + v1 + v2 + v3
+                    indices = [0, 1, 2, 3]
+
+                elif isinstance(shape, OurLine):
+                    render_context = self.sandbox.rc3
+                    vfmt = self.sandbox.dls._vbuffer.vfmt
+
+                    self.sandbox.dls.clear()
+                    self.sandbox.dls.append(shape.points, translate=(tr[4], tr[5]),
+                          color=(1,0,0,1), linewidth=w+2, dash_pattern = 'solid')
+                    vertices = self.sandbox.dls.vertices.tolist()
+                    indices = self.sandbox.dls.indices.tolist()
+                    self.sandbox.dls.bind_textures()
 
                 else:
                     raise NotImplementedError
@@ -1515,7 +1504,7 @@ def update(dt):
                     with render_context:
                         # BindTexture(texture=texture_stroke, index=1)
                         if redraw and self.sandbox.transition_time > 0:
-                            v_len = len(vertices) // 4
+                            v_len = sum([v[1] for v in vfmt])  # len(vertices) // 4
                             # Set initial size to 0, 0
                             initial_vs = tuple(0 if i % v_len in (0, 1) else v for i, v in enumerate(vertices))
                         else:

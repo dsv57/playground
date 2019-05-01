@@ -33,8 +33,8 @@ from functools import reduce
 
 import numpy as np
 
-import kivy.graphics.opengl as gl
-from kivy.graphics import Mesh
+# import kivy.graphics.opengl as gl
+# from kivy.graphics import Mesh
 
 from .dynamic_buffer import DynamicBuffer
 
@@ -112,29 +112,42 @@ class VertexBuffer(object):
 
         self._dsize = offset
         self._vertices = DynamicBuffer(dtype)
-        self._indices  = DynamicBuffer(np.uint32)
+        self._indices  = DynamicBuffer(np.uint16)
         self._vertices_id = 0
         self._indices_id = 0
         self._dirty = True
 
 
     # ---------------------------------
-    def get_vertices(self):
+    @property
+    def vertices(self):
         return self._vertices
-    vertices = property(get_vertices)
-
-
+    
     # ---------------------------------
-    def get_indices(self):
+    @property
+    def indices(self):
         return self._indices
-    indices = property(get_indices)
-
 
     # ---------------------------------
-    def get_attributes(self):
-        return self._attributes
-    attributes = property(get_attributes)
+    @property
+    def vertices_data(self):
+        return self._vertices.data.data.cast('B').cast('f')
+    
+    # ---------------------------------
+    @property
+    def indices_data(self):
+        return self._indices.data.data
 
+    # ---------------------------------
+    @property
+    def attributes(self):
+        return self._attributes
+    
+    # ---------------------------------
+    @property
+    def vfmt(self):
+        return self._vfmt
+        
 
     # ---------------------------------
     def clear(self):
@@ -230,36 +243,36 @@ class VertexBuffer(object):
 
 
     # ---------------------------------
-    def draw( self, mode='triangles' ):  # gl.GL_TRIANGLES ):
+    # def draw( self, mode='triangles' ):  # gl.GL_TRIANGLES ):
 
-        # if self._dirty:
-        #     self.upload()
-        #print('vertices', list(self._vertices.data.flat), self._vertices.dtype, self._vertices.shape)
-        #print('indices', self._indices.data, self._indices.dtype, self._indices.shape)
-        # self._vertices.data.dump(open('vertices.pickle', 'wb'))
-        # open('vertices.bytes', 'wb').write(self._vertices.data.tobytes())
-        # self._indices.data.dump(open('indices.pickle', 'wb'))
-        # open('indices.bytes', 'wb').write(self._indices.data.tobytes())
-        # gl.glBindBuffer( gl.GL_ARRAY_BUFFER, self._vertices_id )
-        # gl.glBindBuffer( gl.GL_ELEMENT_ARRAY_BUFFER, self._indices_id )
-        # for attribute in self._attributes:
-        #     attribute.enable()
-        # gl.glDrawElements( mode, len(self._indices.data), gl.GL_UNSIGNED_INT, None)
-        # gl.glBindBuffer( gl.GL_ELEMENT_ARRAY_BUFFER, 0 )
-        # gl.glBindBuffer( gl.GL_ARRAY_BUFFER, 0 )
-        # print('VBUF', self._vfmt, self._indices.data.data)
-        # from itertools import chain
-        # vs = list(chain(*[tuple(list(v[0])+list(v[1])+list(v[2])+list(v[3])+list(v[4])+[v[5]]) for v in self._vertices.data]))
-        # print(111, vs)
-        # print(222, list(self._indices.data))
-        # import pickle
-        # indices = pickle.load(open('../shadereditor/indices.pickle', 'rb'), encoding='bytes').astype('uint16')
-        # vertices = pickle.load(open('../shadereditor/vertices.pickle', 'rb'), encoding='bytes')
-        return Mesh(
-            fmt=self._vfmt,
-            mode=mode,
-            vertices=self._vertices.data.data.cast('B').cast('f'),
-            indices=self._indices.data.data)
+    #     # if self._dirty:
+    #     #     self.upload()
+    #     #print('vertices', list(self._vertices.data.flat), self._vertices.dtype, self._vertices.shape)
+    #     #print('indices', self._indices.data, self._indices.dtype, self._indices.shape)
+    #     # self._vertices.data.dump(open('vertices.pickle', 'wb'))
+    #     # open('vertices.bytes', 'wb').write(self._vertices.data.tobytes())
+    #     # self._indices.data.dump(open('indices.pickle', 'wb'))
+    #     # open('indices.bytes', 'wb').write(self._indices.data.tobytes())
+    #     # gl.glBindBuffer( gl.GL_ARRAY_BUFFER, self._vertices_id )
+    #     # gl.glBindBuffer( gl.GL_ELEMENT_ARRAY_BUFFER, self._indices_id )
+    #     # for attribute in self._attributes:
+    #     #     attribute.enable()
+    #     # gl.glDrawElements( mode, len(self._indices.data), gl.GL_UNSIGNED_INT, None)
+    #     # gl.glBindBuffer( gl.GL_ELEMENT_ARRAY_BUFFER, 0 )
+    #     # gl.glBindBuffer( gl.GL_ARRAY_BUFFER, 0 )
+    #     # print('VBUF', self._vfmt, self._indices.data.data)
+    #     # from itertools import chain
+    #     # vs = list(chain(*[tuple(list(v[0])+list(v[1])+list(v[2])+list(v[3])+list(v[4])+[v[5]]) for v in self._vertices.data]))
+    #     # print(111, vs)
+    #     # print(222, list(self._indices.data))
+    #     # import pickle
+    #     # indices = pickle.load(open('../shadereditor/indices.pickle', 'rb'), encoding='bytes').astype('uint16')
+    #     # vertices = pickle.load(open('../shadereditor/vertices.pickle', 'rb'), encoding='bytes')
+    #     return Mesh(
+    #         fmt=self._vfmt,
+    #         mode=mode,
+    #         vertices=self._vertices.data.data.cast('B').cast('f'),
+    #         indices=self._indices.data.data)
 
 
 

@@ -16,6 +16,9 @@ from named_colors import COLORS
 from playground.utils import KeepWeakRefs
 
 
+__all__ = ['Color']
+
+
 _dims = {
     'lightness': ('J', 0, 0),
     'brightness': ('Q', 6, 0),
