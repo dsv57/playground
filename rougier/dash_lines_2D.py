@@ -35,7 +35,7 @@ import numpy as np
 # from dash_atlas import DashAtlas
 from .collection import Collection
 
-from kivy.graphics import BindTexture, RenderContext
+from kivy.graphics import Mesh, BindTexture, RenderContext
 from kivy.resources import resource_find
 
 # -----------------------------------------------------------------------------
@@ -193,8 +193,8 @@ class DashLines(Collection):
         V['a_texcoord'][0::2,1] = -1
         V['a_texcoord'][1::2,1] = +1
 
-        I = np.resize( np.array([0,1,2,1,2,3], dtype=np.int64), (n-1)*(2*3))
-        I += np.repeat( 4*np.arange(n-1), 6)
+        I = np.resize( np.array([0,1,2,1,2,3], dtype=np.uint16), (n-1)*(2*3))
+        I += np.repeat( 4*np.arange(n-1, dtype=np.uint16), 6)
 
         return V, I, L[-1]
 
@@ -206,6 +206,21 @@ class DashLines(Collection):
         if uniforms:
             for u, v in uniforms.items():
                 self.context[u] = v
+
+    def bind_textures(self):
+        if self._dirty:
+            self.upload()
+        with self.context:
+            BindTexture(texture=self._texture, index=0)
+
+    @property
+    def vertices(self):
+        return self._vbuffer.vertices_data
+    
+    # ---------------------------------
+    @property
+    def indices(self):
+        return self._vbuffer.indices_data
 
     # ---------------------------------
     def draw(self, mode='triangles'): # gl.GL_TRIANGLES, uniforms = {}):
@@ -227,7 +242,13 @@ class DashLines(Collection):
             # shader.uniformf('u_uniforms_shape', *self._ushape)
             # print('u_uniforms_shape', self._ushape)
             BindTexture(texture=self._texture, index=0)
-            mesh = self._vbuffer.draw(mode)
-            print('DL2D:', self._texture, self._vbuffer._vertices.data)
+            mesh = Mesh(
+                fmt=self._vbuffer.vfmt,
+                mode=mode,
+                vertices=self._vbuffer.vertices_data,
+                indices=self._vbuffer.indices_data)
+            return mesh
+            # mesh = self._vbuffer.draw(mode)
+            # print('DL2D:', self._texture, self._vbuffer._vertices.data)
             # print('draw_mode', mode)
             # shader.unbind()
