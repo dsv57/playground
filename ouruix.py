@@ -60,6 +60,8 @@ from sprite import Sprite
 from codean import autocomp, CodeRunner, Break, COMMON_CODE
 from sokoban.sokoban import Sokoban
 
+from rougier.dash_lines_2D import DashLines
+
 from playground import utils
 from playground.color import _srgb_to_linear, _parse_srgb, _global_update_colors, Color as OurColor
 from playground.shapes import Stroke, Physics, Shape, Circle, Rectangle, KeepRefs, Image as OurImage
@@ -722,6 +724,39 @@ class OurSandbox(FocusBehavior, ScatterPlane):
         self.rc2.shader.source = resource_find('shader2.glsl')
         self.rc1['texture1'] = 1
         self.rc2['texture1'] = 1
+
+        self.dls = DashLines()
+        self.rc3 = self.dls.context
+        import numpy as np
+        lw = 20
+        x0,y0 = 500.0, 500.0
+        coils = 3 #12
+        rho_max = 450.
+        theta_max = coils * 2 * np.pi
+        rho_step = rho_max / theta_max
+
+        P=[]
+        chord = 1
+        theta = 1 + chord / rho_step
+        while theta <= theta_max:
+            rho = rho_step * theta
+            x = rho * np.cos( theta )
+            y = rho * np.sin( theta )
+            P.append( (x,y) )
+            theta += chord / rho
+            chord += .05
+
+        self.dls.append(P, translate=(x0,y0),
+                          color=(1,0,0,1), linewidth=lw+2, dash_pattern = 'solid')
+        self.dls.set_uniforms({
+            'modelview_mat': self.transform,
+            'resolution': list(map(float, self.size)),
+            'scale': self.transform[0]
+        })
+        self.dls.draw()
+
+
+
         # x, y, w, *stroke, *fill, a1, a2, *tr
         self.rc1_vfmt = (
             (b'size',   2, 'float'),
@@ -787,6 +822,14 @@ class OurSandbox(FocusBehavior, ScatterPlane):
             rc['time'] = Clock.get_boottime()
             rc['scale'] = self.transform[0]
             rc['texture1'] = 1
+        # self.rc3['modelview_mat'] = self.transform
+        # self.rc3['resolution'] = list(map(float, self.size))
+        # self.rc3['scale'] = self.transform[0]
+        self.dls.set_uniforms({
+            'modelview_mat': self.transform,
+            'resolution': list(map(float, self.size)),
+            'scale': self.transform[0]
+        })
         self.canvas.ask_update()
 
     # def add_widget(self, *largs):
@@ -1800,6 +1843,7 @@ def update(dt):
             self.sandbox.add_widget(widget)
         self.sandbox.canvas.add(self.sandbox.rc1)
         self.sandbox.canvas.add(self.sandbox.rc2)
+        self.sandbox.canvas.add(self.sandbox.rc3)
 
         # self.sandbox.fbo.add(self.sandbox.rc1)
         # self.sandbox.fbo.add(self.sandbox.rc2)
