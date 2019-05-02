@@ -213,9 +213,10 @@ class DashLines(Collection):
     def bind_textures(self):
         if self._dirty:
             self.upload()
+        # self.dash_atlas.upload()
         with self.context:
             BindTexture(texture=self._texture, index=2)
-            BindTexture(texture=self.dash_atlas.texture, index=3)
+            # BindTexture(texture=self.dash_atlas.texture, index=3)
 
     @property
     def vertices(self):

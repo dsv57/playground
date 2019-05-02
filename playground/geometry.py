@@ -549,11 +549,6 @@ class VectorRef(Vector):
         new_y = x * s + y * c
         self._fset(new_x, new_y)
 
-    def rotated(self, angle):
-        v = Vector(self)
-        v.rotate(angle)
-        return v
-
     @property
     def length(self):
         x, y = self._fget()

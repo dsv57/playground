@@ -26,12 +26,14 @@ from functools import reduce
 from .vertex_buffer import VertexBuffer
 from .dynamic_buffer import DynamicBuffer
 
+# from kivy.graphics import Callback
 from kivy.graphics.texture import Texture
 from kivy.graphics.opengl import glTexImage2D, glGetIntegerv, glPixelStorei, \
-    GL_PACK_ALIGNMENT, GL_UNPACK_ALIGNMENT, GL_MAX_TEXTURE_SIZE, GL_TEXTURE_2D, \
-    GL_RGBA, GL_FLOAT
+    glBindTexture, GL_PACK_ALIGNMENT, GL_UNPACK_ALIGNMENT, GL_MAX_TEXTURE_SIZE, \
+    GL_TEXTURE_2D, GL_RGBA, GL_FLOAT
 
 GL_RGBA32F = 34836
+
 
 # -----------------------------------------------------------------------------
 def dtype_reduce(dtype, level=0, depth=0):
@@ -445,23 +447,37 @@ class Collection(object):
         # gl.glTexImage2D( gl.GL_TEXTURE_2D, 0, gl.GL_RGBA32F,
         #                  shape[1], shape[0], 0, gl.GL_RGBA, gl.GL_FLOAT, data )
 
-        def upload_data(context):
-            self._texture.bind()
+        def upload_data(texture):
+            # texture.bind()
+            # print('upload_data begin.')
+            texture.bind()
+            # glBindTexture( GL_TEXTURE_2D, texture.id )
             glPixelStorei( GL_UNPACK_ALIGNMENT, 1 )
             glPixelStorei( GL_PACK_ALIGNMENT, 1 )
+            # glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+            # glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
+            # glPixelStorei(GL_UNPACK_SKIP_ROWS, 0);
+            # data2 = np.zeros(len(data), dtype=data.dtype)
+            # data2 = 
+            # print('Data shape:', data.shape, shape)
+            # l = len(data.tobytes()) // 16
+            # print('Data:', l, data)
+            # FIXME FIXME FIXME: Segfault on glTexImage2D with "short" data.
             glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA32F,
-                          shape[1], shape[0], 0, GL_RGBA, GL_FLOAT,  data.tobytes() )
+                          shape[1], shape[0], 0, GL_RGBA, GL_FLOAT, data.tobytes()*2 )
+            # print('upload_data done.')
 
         tex = self._texture
         if tex is None:
-            # tex = self._texture = Texture(
-            #     width=shape[1], height=shape[0], target=GL_TEXTURE_2D, texid=2, colorfmt='rgba',
-            #     bufferfmt='float', mipmap=False, source=None, callback=None, icolorfmt='rgba')
-            # TODO: callback?
             tex = self._texture = Texture.create((shape[1], shape[0]), 'rgba', 'float', False, upload_data, 'rgba')
+            # tex = self._texture = Texture.create((shape[1], shape[0]), 'rgba', 'float', False, None, 'rgba')
             tex.min_filter = 'nearest'
             tex.mag_filter = 'nearest'
             tex.wrap = 'clamp_to_edge'  # default
+        # tex.ask_update(upload_data)
+        else:
+            tex.ask_update(upload_data)
+            # upload_data(tex)
         # tex.blit_buffer(data, colorfmt='rgba', bufferfmt='float')
         # tex.bind()
         # glBindTexture( GL_TEXTURE_2D, 1 )
