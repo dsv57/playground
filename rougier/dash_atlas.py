@@ -33,7 +33,11 @@
 # policies, either expressed or implied, of Nicolas P. Rougier.
 # ----------------------------------------------------------------------------
 import numpy as np
-import OpenGL.GL as gl
+# import OpenGL.GL as gl
+
+from kivy.graphics.texture import Texture
+from kivy.graphics.opengl import glTexImage2D, glPixelStorei, GL_TEXTURE_2D, \
+    GL_RGBA, GL_FLOAT, GL_PACK_ALIGNMENT, GL_UNPACK_ALIGNMENT
 
 
 class DashAtlas(object):
@@ -42,6 +46,7 @@ class DashAtlas(object):
     def __init__(self,shape=(64,1024,4)):
         # 512 patterns at max
         self._data      = np.zeros(shape, dtype=np.float32)
+        self._texture   = None
         self._texture_id = 0
         self._index      = 0
         self._atlas      = {}
@@ -133,23 +138,39 @@ class DashAtlas(object):
 
     # ---------------------------------
     def upload(self):
+        def upload_data(context):
+            self._texture.bind()
+            glPixelStorei( GL_UNPACK_ALIGNMENT, 1 )
+            glPixelStorei( GL_PACK_ALIGNMENT, 1 )
+            glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA32F,
+                         shape[1], shape[0], 0, GL_RGBA, GL_FLOAT,  self._data.data.tobytes() )
 
-        gl.glEnable (gl.GL_TEXTURE_2D)
-        if not self._texture_id:
-            self._texture_id = gl.glGenTextures( 1 )
-        gl.glBindTexture( gl.GL_TEXTURE_2D, self._texture_id )
-        gl.glPixelStorei( gl.GL_UNPACK_ALIGNMENT, 1 )
-        gl.glPixelStorei( gl.GL_PACK_ALIGNMENT, 1 )
-        gl.glTexParameterf( gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MIN_FILTER, gl.GL_NEAREST )
-        gl.glTexParameterf( gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MAG_FILTER, gl.GL_NEAREST )
-        gl.glTexParameterf( gl.GL_TEXTURE_2D, gl.GL_TEXTURE_WRAP_S, gl.GL_REPEAT )
-        gl.glTexParameterf( gl.GL_TEXTURE_2D, gl.GL_TEXTURE_WRAP_T, gl.GL_REPEAT )
-        gl.glPixelTransferf( gl.GL_ALPHA_SCALE, 1 )
-        gl.glPixelTransferf( gl.GL_ALPHA_BIAS, 0 )
-        gl.glTexImage2D( gl.GL_TEXTURE_2D, 0, gl.GL_RGBA32F,
-                         self._data.shape[1], self._data.shape[0], 0,
-                         gl.GL_RGBA, gl.GL_FLOAT, self._data )
+        tex = self._texture
+        if tex is None:
+            tex = self._texture = Texture.create((shape[1], shape[0]), 'rgba', 'float', False, upload_data, 'rgba')
+            self._texture_id = tex.id
+            tex.min_filter = 'nearest'
+            tex.mag_filter = 'nearest'
+            tex.wrap = 'clamp_to_edge'  # default
+
+        # gl.glEnable (gl.GL_TEXTURE_2D)
+        # if not self._texture_id:
+        #     self._texture_id = gl.glGenTextures( 1 )
+        # gl.glBindTexture( gl.GL_TEXTURE_2D, self._texture_id )
+        # gl.glTexParameterf( gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MIN_FILTER, gl.GL_NEAREST )
+        # gl.glTexParameterf( gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MAG_FILTER, gl.GL_NEAREST )
+        # gl.glTexParameterf( gl.GL_TEXTURE_2D, gl.GL_TEXTURE_WRAP_S, gl.GL_REPEAT )
+        # gl.glTexParameterf( gl.GL_TEXTURE_2D, gl.GL_TEXTURE_WRAP_T, gl.GL_REPEAT )
+        # gl.glPixelTransferf( gl.GL_ALPHA_SCALE, 1 )
+        # gl.glPixelTransferf( gl.GL_ALPHA_BIAS, 0 )
+        # gl.glTexImage2D( gl.GL_TEXTURE_2D, 0, gl.GL_RGBA32F,
+        #                  self._data.shape[1], self._data.shape[0], 0,
+        #                  gl.GL_RGBA, gl.GL_FLOAT, self._data )
         #print('DASH ATLAS', list(self._data.flatten()))
 
         self._dirty = False
-        
+
+    @property
+    def texture(self):
+        return self._texture
+    

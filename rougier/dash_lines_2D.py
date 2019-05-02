@@ -32,11 +32,13 @@ import os
 import numpy as np
 # import OpenGL.GL as gl
 # from shader import Shader
-# from dash_atlas import DashAtlas
-from .collection import Collection
 
 from kivy.graphics import Mesh, BindTexture, RenderContext
 from kivy.resources import resource_find
+
+from .dash_atlas import DashAtlas
+from .collection import Collection
+
 
 # -----------------------------------------------------------------------------
 class DashLines(Collection):
@@ -91,10 +93,10 @@ class DashLines(Collection):
         # vertex_shader= os.path.join( shaders, 'dash-lines-2D.vert')
         # fragment_shader= os.path.join( shaders, 'dash-lines-2D.frag')
         #fragment_shader= os.path.join( shaders, 'test.frag')
-        # if dash_atlas is None:
-        #     self.dash_atlas = DashAtlas()
-        # else:
-        #     self.dash_atlas = dash_atlas
+        if dash_atlas is None:
+            self.dash_atlas = DashAtlas()
+        else:
+            self.dash_atlas = dash_atlas
         # self.shader = Shader( open(vertex_shader).read(),
                               # open(fragment_shader).read() )
         self.context = RenderContext(use_parent_modelview=True, use_parent_projection=True)
@@ -123,13 +125,13 @@ class DashLines(Collection):
                              self.caps.get(linecaps[1], 'round') )
         U['miter_limit'] = miter_limit
         U['length']      = length
-        # if self.dash_atlas:
-        #     dash_index, dash_period = self.dash_atlas[dash_pattern]
-        #     U['dash_phase']  = dash_phase
-        #     U['dash_index']  = dash_index
-        #     U['dash_period'] = dash_period
-        #     U['dash_caps']   = ( self.caps.get(dash_caps[0], 'round'),
-        #                          self.caps.get(dash_caps[1], 'round') )
+        if self.dash_atlas:
+            dash_index, dash_period = self.dash_atlas[dash_pattern]
+            U['dash_phase']  = dash_phase
+            U['dash_index']  = dash_index
+            U['dash_period'] = dash_period
+            U['dash_caps']   = ( self.caps.get(dash_caps[0], 'round'),
+                                 self.caps.get(dash_caps[1], 'round') )
         Collection.append(self,V,I,U)
 
 
@@ -201,7 +203,8 @@ class DashLines(Collection):
     # ---------------------------------
     def set_uniforms(self, uniforms=None):
         # FIXME: use context.update?
-        self.context['u_uniforms'] = 0
+        self.context['u_uniforms'] = 2
+        self.context['u_dash_atlas'] = 3
         self.context['u_uniforms_shape'] = list(map(float, self._ushape))
         if uniforms:
             for u, v in uniforms.items():
@@ -211,7 +214,8 @@ class DashLines(Collection):
         if self._dirty:
             self.upload()
         with self.context:
-            BindTexture(texture=self._texture, index=0)
+            BindTexture(texture=self._texture, index=2)
+            BindTexture(texture=self.dash_atlas.texture, index=3)
 
     @property
     def vertices(self):
@@ -232,7 +236,8 @@ class DashLines(Collection):
             # gl.glActiveTexture( gl.GL_TEXTURE0 )
             # shader.uniformi( 'u_uniforms', 0 )
             # gl.glBindTexture( gl.GL_TEXTURE_2D, self._ubuffer_id )
-            # if self.dash_atlas:
+            if self.dash_atlas:
+                BindTexture(texture=self.dash_atlas.texture, index=3)
             #     gl.glActiveTexture( gl.GL_TEXTURE1 )
             #     shader.uniformi('u_dash_atlas', 1)
             #     gl.glBindTexture( gl.GL_TEXTURE_2D, self.dash_atlas.texture_id )
@@ -241,7 +246,7 @@ class DashLines(Collection):
             #     shader.uniform(name, value)
             # shader.uniformf('u_uniforms_shape', *self._ushape)
             # print('u_uniforms_shape', self._ushape)
-            BindTexture(texture=self._texture, index=0)
+            BindTexture(texture=self._texture, index=2)
             mesh = Mesh(
                 fmt=self._vbuffer.vfmt,
                 mode=mode,

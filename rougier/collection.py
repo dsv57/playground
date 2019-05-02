@@ -27,7 +27,9 @@ from .vertex_buffer import VertexBuffer
 from .dynamic_buffer import DynamicBuffer
 
 from kivy.graphics.texture import Texture
-from kivy.graphics.opengl import glTexImage2D, glGetIntegerv, GL_MAX_TEXTURE_SIZE, GL_TEXTURE_2D, GL_RGBA, GL_FLOAT
+from kivy.graphics.opengl import glTexImage2D, glGetIntegerv, glPixelStorei, \
+    GL_PACK_ALIGNMENT, GL_UNPACK_ALIGNMENT, GL_MAX_TEXTURE_SIZE, GL_TEXTURE_2D, \
+    GL_RGBA, GL_FLOAT
 
 GL_RGBA32F = 34836
 
@@ -443,16 +445,25 @@ class Collection(object):
         # gl.glTexImage2D( gl.GL_TEXTURE_2D, 0, gl.GL_RGBA32F,
         #                  shape[1], shape[0], 0, gl.GL_RGBA, gl.GL_FLOAT, data )
 
+        def upload_data(context):
+            self._texture.bind()
+            glPixelStorei( GL_UNPACK_ALIGNMENT, 1 )
+            glPixelStorei( GL_PACK_ALIGNMENT, 1 )
+            glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA32F,
+                          shape[1], shape[0], 0, GL_RGBA, GL_FLOAT,  data.tobytes() )
+
         tex = self._texture
         if tex is None:
-            tex = self._texture = Texture(
-                width=shape[1], height=shape[0], target=GL_TEXTURE_2D, texid=0, colorfmt='rgba',
-                bufferfmt='float', mipmap=False, source=None, callback=None, icolorfmt='rgba')
+            # tex = self._texture = Texture(
+            #     width=shape[1], height=shape[0], target=GL_TEXTURE_2D, texid=2, colorfmt='rgba',
+            #     bufferfmt='float', mipmap=False, source=None, callback=None, icolorfmt='rgba')
+            # TODO: callback?
+            tex = self._texture = Texture.create((shape[1], shape[0]), 'rgba', 'float', False, upload_data, 'rgba')
             tex.min_filter = 'nearest'
             tex.mag_filter = 'nearest'
             tex.wrap = 'clamp_to_edge'  # default
         # tex.blit_buffer(data, colorfmt='rgba', bufferfmt='float')
-        tex.bind()
+        # tex.bind()
         # glBindTexture( GL_TEXTURE_2D, 1 )
         # GL_TEXTURE_BASE_LEVEL = 0x813C
         # GL_TEXTURE_MAX_LEVEL = 0x813D
@@ -465,8 +476,8 @@ class Collection(object):
         # glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0)
         # glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0)
         # GL_RGBA32F = 34836
-        glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA32F,
-                     shape[1], shape[0], 0, GL_RGBA, GL_FLOAT,  data.tobytes() )
+        # glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA32F,
+                     # shape[1], shape[0], 0, GL_RGBA, GL_FLOAT,  data.tobytes() )
         # self._texture = tex
 
         self._ubuffer._dirty = False
