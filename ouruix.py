@@ -1297,14 +1297,9 @@ def update(dt):
 
     def update_sandbox(self, redraw=True):
         from difflib import SequenceMatcher
-        # redraw = True
         matcher_opcodes = None
-        # indices = [0, 1, 2, 3] #[1, 2, 0, 3] # [0, 3, 1, 2] #[0,3,1,2] #[0, 1, 3, 2]
-        # [u, v, u + w, v, u + w, v + h, u, v + h]
         tex_coords_fill = tex_coords_stroke = 0.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0
-        # print('self.sandbox.shapes_by_trace', self.sandbox.shapes_by_trace)
         def update_texture(image, texture):
-            # print("Hi!", self.sandbox.images, image.source)
             if image.source in self.sandbox.image_meshes:
                 for mesh in self.sandbox.image_meshes[image.source]:
                     mesh.texture = texture
@@ -1553,21 +1548,11 @@ def update(dt):
                     for context, instructions in shape:
                         for inst in instructions:
                             context.remove(inst)
-                # for oid in oids:
-                #     self.sandbox.shapes_by_id.pop(oid, None)
-            # to_remove = set(old_render_shapes) - set(shape_ids)
-            # old_shapes = {id(s[0][1][0]): (s[0][0], s[0][1][0]) for shape in self.sandbox.shapes_by_id.values()}
-            # print('old_shapes', len(old_shapes))
-            # print('new shapes', len([id(s[0][1][0]) for s in self.sandbox.shapes_by_id.values()]))
-            # to_remove = set(old_shapes) - set([id(s[0][1][0]) for s in self.sandbox.shapes_by_id.values()])
             to_remove = old_shapes - set([shape for shape in self.sandbox.shapes_by_id.values()])
-
 
             for shape_trace in set(self.sandbox.shapes_by_trace) - set(shape_traces):
                 self.sandbox.shapes_by_trace.pop(shape_trace)
 
-            # for sid in to_remove:
-            #     context, mesh = old_shapes[sid]
             if self.sandbox.transition_time > 0:
                 for shape in to_remove:
                     for context, instructions in shape:
