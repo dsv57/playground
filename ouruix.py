@@ -819,8 +819,8 @@ class OurSandbox(FocusBehavior, ScatterPlane):
         # self.rc3['scale'] = self.transform[0]
         self.dls.set_uniforms({
             'modelview_mat': self.transform,
-            'resolution': list(map(float, self.size)),
-            'scale': self.transform[0]
+            # 'resolution': list(map(float, self.size)),
+            'u_scale': self.transform[0]
         })
         self.canvas.ask_update()
 
@@ -915,6 +915,7 @@ class OurSandbox(FocusBehavior, ScatterPlane):
         if keycode[1] == 'f2':
             self.rc1.shader.source = resource_find('shader1.glsl')
             self.rc2.shader.source = resource_find('shader2.glsl')
+            self.rc3.shader.source = resource_find('dash-lines-2D.glsl')
             self.canvas.shader.fs = open(resource_find('srgb_to_linear.glsl')).read()
             print('projection_mat\n', self.canvas['projection_mat'])
             print('modelview_mat\n', self.canvas['modelview_mat'])

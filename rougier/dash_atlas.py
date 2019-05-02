@@ -36,8 +36,11 @@ import numpy as np
 # import OpenGL.GL as gl
 
 from kivy.graphics.texture import Texture
-from kivy.graphics.opengl import glTexImage2D, glPixelStorei, GL_TEXTURE_2D, \
-    GL_RGBA, GL_FLOAT, GL_PACK_ALIGNMENT, GL_UNPACK_ALIGNMENT
+from kivy.graphics.opengl import glTexImage2D, glPixelStorei, glBindTexture, \
+    GL_TEXTURE_2D, GL_RGBA, GL_FLOAT, GL_PACK_ALIGNMENT, GL_UNPACK_ALIGNMENT
+# from kivy.graphics.instructions import Callback
+
+GL_RGBA32F = 34836
 
 
 class DashAtlas(object):
@@ -64,7 +67,7 @@ class DashAtlas(object):
         self['densely dashdotdotted'] = (1,1,0,1,0,1), (1,1,1,1)
         self['dashdotdotted']         = (1,2,0,2,0,2), (1,1,1,1,1,1)
         self['loosely dashdotdotted'] = (1,3,0,3,0,3), (1,1,1,1)
-        self['custom']                 = (.1,.1),       (1,1)
+        self['custom']                = (.1,.1),       (1,1)
 
         self._dirty = True
 
@@ -138,20 +141,26 @@ class DashAtlas(object):
 
     # ---------------------------------
     def upload(self):
-        def upload_data(context):
-            self._texture.bind()
+        def upload_data(texture):
+            texture.bind()
+            # glBindTexture( GL_TEXTURE_2D, texture.id )
             glPixelStorei( GL_UNPACK_ALIGNMENT, 1 )
             glPixelStorei( GL_PACK_ALIGNMENT, 1 )
-            glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA32F,
-                         shape[1], shape[0], 0, GL_RGBA, GL_FLOAT,  self._data.data.tobytes() )
+            glTexImage2D(
+                GL_TEXTURE_2D, 0, GL_RGBA32F, self._data.shape[1], self._data.shape[0],
+                0, GL_RGBA, GL_FLOAT,  self._data.tobytes() )
 
         tex = self._texture
         if tex is None:
-            tex = self._texture = Texture.create((shape[1], shape[0]), 'rgba', 'float', False, upload_data, 'rgba')
+            tex = self._texture = Texture.create(
+                (self._data.shape[1], self._data.shape[0]),
+                'rgba', 'float', False, upload_data, 'rgba')
             self._texture_id = tex.id
             tex.min_filter = 'nearest'
             tex.mag_filter = 'nearest'
             tex.wrap = 'clamp_to_edge'  # default
+        else:
+            tex.ask_update(upload_data)
 
         # gl.glEnable (gl.GL_TEXTURE_2D)
         # if not self._texture_id:
