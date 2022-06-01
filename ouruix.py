@@ -600,10 +600,10 @@ class CodeEditor(CodeInput, FocusBehavior):
         viewport_width = self.width - padding_left - padding_right
         sx = self.scroll_x
         offset = self.cursor_offset()
-        if offset > viewport_width + sx - 25:
-            self.scroll_x = offset - viewport_width + 25
-        if offset < min(sx + 25, viewport_width):
-            self.scroll_x = offset + 25
+        if offset > viewport_width + sx - 50:
+            self.scroll_x = offset - viewport_width + 50
+        if offset < min(sx + 50, viewport_width):
+            self.scroll_x = max(0, offset - 50) # + 25 # FIXME TODO BUG
         return ret
 
     cursor = AliasProperty(_get_cursor, _set_cursor)
@@ -1232,7 +1232,7 @@ def update(dt):
                 scrlv.scroll_y = scrlv.scroll_y + scrlv.convert_distance_to_scroll(0, dy)[1]
 
     def code_editor_on_key_down(self, widget, window, keycode, text, modifiers):
-        print('code_editor_on_key_down', keycode, text, modifiers)
+        # print('code_editor_on_key_down', keycode, text, modifiers)
         if keycode[1] == 'f5':
             self.step = 0
             self.prev_step = 0
@@ -1537,6 +1537,7 @@ def update(dt):
                         if mesh is not None:
                             mesh.vertices = vertices
                     Animation.stop_all(mesh)
+                    # FIXME: Fails when line becomes shorter on animation.py:361: return tp([_calculate(a[x], b[x], t) for x in range(len(a))])
                     anim = Animation(vertices=vertices, t=self.sandbox.transition_out,
                         duration=self.sandbox.transition_time)
                     anim.bind(on_complete=_on_complete)
@@ -1810,7 +1811,7 @@ def update(dt):
         if self.sandbox.space:
             self.sandbox.space.remove(*self.sandbox.space.shapes, *self.sandbox.space.bodies)
         self.sandbox.space = pymunk.Space()
-        self.sandbox.space.gravity = self._gravity
+        # self.sandbox.space.gravity = self._gravity
         self.sandbox.space.sleep_time_threshold = 3.0
         self.sandbox.space.replay_mode = False
         for widget in saved:

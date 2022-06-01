@@ -17,7 +17,7 @@ import os.path
 # kivy.graphics.Color = Color
 
 import kivy
-kivy.require('1.0.6')
+#kivy.require('1.0.6')
 
 from kivy.app import App
 from kivy.config import Config

@@ -30,7 +30,10 @@ from .dynamic_buffer import DynamicBuffer
 from kivy.graphics.texture import Texture
 from kivy.graphics.opengl import glTexImage2D, glGetIntegerv, glPixelStorei, \
     glBindTexture, GL_PACK_ALIGNMENT, GL_UNPACK_ALIGNMENT, GL_MAX_TEXTURE_SIZE, \
-    GL_TEXTURE_2D, GL_RGBA, GL_FLOAT
+    GL_TEXTURE_2D, GL_RGBA, GL_FLOAT, glTexParameterf
+
+# FIXME: Remove next line
+import OpenGL.GL as gl2
 
 GL_RGBA32F = 34836
 
@@ -270,8 +273,9 @@ class Collection(object):
         # self._ubuffer_id = 0
         self._texture = None
         self._max_texture_size = glGetIntegerv(GL_MAX_TEXTURE_SIZE)[0]
+        #print('self._max_texture_size', self._max_texture_size)
         self._compute_ushape(1)
-        # print(11111111, self._ushape, count, self._ushape[1] // (count//4))
+        #print(11111111, self._ushape, count, self._ushape[1] // (count//4))
         self._ubuffer.reserve( self._ushape[1] // (count//4) )
         self._dirty = True
 
@@ -461,21 +465,24 @@ class Collection(object):
             # data2 = 
             # print('Data shape:', data.shape, shape)
             # l = len(data.tobytes()) // 16
-            # print('Data:', l, data)
+            print('Data:', len(data), len(data.tobytes()))
+            glTexParameterf(gl2.GL_TEXTURE_2D, gl2.GL_TEXTURE_BASE_LEVEL, 0) # FIXME: Not needed
+            glTexParameterf(gl2.GL_TEXTURE_2D, gl2.GL_TEXTURE_MAX_LEVEL, 0) # FIXME: Not needed
             # FIXME FIXME FIXME: Segfault on glTexImage2D with "short" data.
             glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA32F,
-                          shape[1], shape[0], 0, GL_RGBA, GL_FLOAT, data.tobytes()*2 )
+                    shape[1], shape[0], 0, GL_RGBA, GL_FLOAT, data.tobytes() )
+            print('data:', data)
             # print('upload_data done.')
 
         tex = self._texture
         if tex is None:
-            tex = self._texture = Texture.create((shape[1], shape[0]), 'rgba', 'float', False, upload_data, 'rgba')
-            # tex = self._texture = Texture.create((shape[1], shape[0]), 'rgba', 'float', False, None, 'rgba')
+            # tex = self._texture = Texture.create((shape[1], shape[0]), 'rgba', 'float', False, upload_data, 'rgba')
+            tex = self._texture = Texture.create((shape[1]*2, shape[0]), 'rgba', 'float', False, None, 'rgba')
             tex.min_filter = 'nearest'
             tex.mag_filter = 'nearest'
             tex.wrap = 'clamp_to_edge'  # default
         # tex.ask_update(upload_data)
-        else:
+        # else:
             tex.ask_update(upload_data)
             # upload_data(tex)
         # tex.blit_buffer(data, colorfmt='rgba', bufferfmt='float')
