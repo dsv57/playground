@@ -720,7 +720,7 @@ class Color(KeepWeakRefs):
         self._xyz_color = cam16.to_xyz100(data, self._mode)
         # self._color = cam16.from_xyz100(xyz)  # Update other variables
         # print('_update_from_cam16')
-        f = inspect.currentframe()
+        # f = inspect.currentframe()
 
     def _invalidate(self):
         for ltr in _ltrs:
@@ -733,9 +733,14 @@ class Color(KeepWeakRefs):
         self._modified = True
 
     def _update_srgb_from_xyz(self):
-        linear_srgb = np.nan_to_num(_srgb_linear.from_xyz100(self._xyz_color))
-        self._is_clipped = any([c < 0. or c > 1. for c in linear_srgb])
-        linear_srgb.clip(0., 1., linear_srgb)
+        linear_srgb = _srgb_linear.from_xyz100(self._xyz_color)
+        self._is_clipped = False
+        if np.any(np.isnan(linear_srgb)):
+            linear_srgb = np.nan_to_num(linear_srgb, False)
+            self._is_clipped = True
+        if np.any((linear_srgb < 0.) + (linear_srgb > 1.)):
+            self._is_clipped = True
+            linear_srgb.clip(0., 1., linear_srgb)
         self._linear_srgb_color = linear_srgb
         self._srgb_color = _srgb_from_linear(linear_srgb)
 
@@ -811,8 +816,9 @@ class Color(KeepWeakRefs):
             if self._linear_srgb_color is not None:
                 self._xyz_color = srgb.to_xyz100(self._linear_srgb_color) # srgb.from_srgb1(self._srgb_color))
             else:
+                data = [self._color[_ltr2pos[c]] for c in self._mode]
                 cam16 = self._own_cam.cam16
-                self._xyz_color = cam16.to_xyz100(self._color, self._mode)
+                self._xyz_color = cam16.to_xyz100(data, self._mode)
             # srgb_color = srgb.to_srgb1(srgb.from_xyz100(self._xyz_color))
             # self._srgb_color = srgb_color
         return self._xyz_color
@@ -991,7 +997,7 @@ def _global_update_colors():
     if need_srgb:
         data = np.array([clr._xyz_color for clr in need_srgb])
         lsrgb_clrs = _srgb_linear.from_xyz100(data.T).T
-        clipped = np.any((lsrgb_clrs > 1.) + (lsrgb_clrs < 0.), axis=1)
+        clipped = np.any((lsrgb_clrs > 1.) + (lsrgb_clrs < 0.) + np.isnan(lsrgb_clrs), axis=1)
         lsrgb_clrs = np.nan_to_num(lsrgb_clrs, False)
         lsrgb_clrs.clip(0., 1., lsrgb_clrs)
         srgb_clrs = _srgb_linear.to_srgb1(lsrgb_clrs.T).T

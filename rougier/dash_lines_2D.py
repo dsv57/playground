@@ -127,6 +127,7 @@ class DashLines(Collection):
         U['length']      = length
         if self.dash_atlas:
             dash_index, dash_period = self.dash_atlas[dash_pattern]
+            print('dash_index, dash_period', dash_index, dash_period)
             U['dash_phase']  = dash_phase
             U['dash_index']  = dash_index
             U['dash_period'] = dash_period
@@ -145,6 +146,7 @@ class DashLines(Collection):
 
         n = len(vertices)
         P = np.array(vertices).reshape(n,2).astype(float)
+        idx = np.arange(n)  # used to eventually tile the color array
 
         dx,dy = P[0] - P[-1]
         d = np.sqrt(dx*dx+dy*dy)
@@ -152,6 +154,7 @@ class DashLines(Collection):
         # If closed, make sure first vertex = last vertex (+/- epsilon=1e-10)
         if closed and d > 1e-10:
             P = np.append(P, P[0]).reshape(n+1,2)
+            idx = np.append(idx, idx[-1])
             n+= 1
 
         V = np.zeros( len(P), dtype = self.vtype )
@@ -163,11 +166,9 @@ class DashLines(Collection):
         N = np.sqrt(T[:,0]**2 + T[:,1]**2)
         # T /= N.reshape(len(T),1)
         V['a_tangents'][+1:, :2] = T
-        if closed: V['a_tangents'][0  , :2] = T[-1]
-        else:      V['a_tangents'][0  , :2] = T[0]
+        V['a_tangents'][0, :2] = T[-1] if closed else T[0]
         V['a_tangents'][:-1, 2:] = T
-        if closed: V['a_tangents'][ -1, 2:] = T[0]
-        else:      V['a_tangents'][ -1, 2:] = T[-1]
+        V['a_tangents'][-1, 2:] = T[0] if closed else T[-1]
 
         # Angles
         T1 = V['a_tangents'][:,:2]
@@ -189,16 +190,25 @@ class DashLines(Collection):
         V['a_angles'][1:] = V['a_angles'][:-1] 
         V['a_texcoord'][0::2] = -1
         V['a_texcoord'][1::2] = +1
+        idx = np.repeat(idx, 2)[1:-1]
 
         # Step 2: A -- B, B' -- C  -> A0/A1 -- B0/B1, B'0/B'1 -- C0/C1
         V = np.repeat(V,2,axis=0)
         V['a_texcoord'][0::2,1] = -1
         V['a_texcoord'][1::2,1] = +1
+        idx = np.repeat(idx, 2)
 
-        I = np.resize( np.array([0,1,2,1,2,3], dtype=np.uint16), (n-1)*(2*3))
-        I += np.repeat( 4*np.arange(n-1, dtype=np.uint16), 6)
+        idxs = np.resize(np.array([0, 1, 2, 1, 2, 3], dtype=np.uint32),
+                         (n-1)*(2*3))
+        idxs += np.repeat(4*np.arange(n-1, dtype=np.uint32), 6)
 
-        return V, I, L[-1]
+        # I = np.resize( np.array([0,1,2,1,2,3], dtype=np.uint16), (n-1)*(2*3))
+        # I += np.repeat( 4*np.arange(n-1, dtype=np.uint16), 6)
+
+        print('L[-1]', L[-1])
+        # print('I', I)
+        # print('idxs', idxs)
+        return V, idxs, L[-1]
 
     # ---------------------------------
     def set_uniforms(self, uniforms=None):
@@ -214,6 +224,7 @@ class DashLines(Collection):
         if self._dirty:
             self.upload()
         # self.dash_atlas.upload()
+        print('Vertices:', self.vertices.tolist())
         with self.context:
             BindTexture(texture=self._texture, index=2)
             # BindTexture(texture=self.dash_atlas.texture, index=3)
@@ -229,6 +240,7 @@ class DashLines(Collection):
 
     # ---------------------------------
     def draw(self, mode='triangles'): # gl.GL_TRIANGLES, uniforms = {}):
+        # NOT USED!
         with self.context:
             if self._dirty:
                 self.upload()
