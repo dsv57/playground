@@ -91,99 +91,7 @@ R_TURN = re.compile(r'^(\s*)(right|left|up|down)\(([0-9]*)\)$')
 
 utils.resource_paths = resource_paths
 
-# grace_hopper = Image(source='grace_hopper.jpg', mipmap=True, anim_delay=0.04166) #, keep_data=True)
-# print(grace_hopper, grace_hopper.texture, grace_hopper.texture.tex_coords, grace_hopper.texture.uvpos, grace_hopper.texture.uvsize)
-# grace_hopper.texture.blit_buffer(pbuffer=_srgba_bytes_to_linear(grace_hopper.texture.pixels), colorfmt='rgba')
-# print(grace_hopper.texture.pixels)
-# raise Exception
-# texture = Texture.create_from_data(grace_hopper.data)
-# print(texture, texture.)
 
-# def texture_to_linear_srgb(texture):
-
-#     fbo = Fbo(size=texture.size)
-#     fbo.shader.fs = '''
-#     $HEADER$
-
-#     vec3 to_linear(vec3 srgb){
-#         vec3 cutoff = vec3(lessThan(srgb, vec3(12.92 * 0.0031308)));
-#         vec3 higher = pow((srgb + 0.055) / 1.055, vec3(2.4));
-#         vec3 lower = srgb / vec3(12.92);
-#         return mix(higher, lower, cutoff);
-#     }
-
-#     void main (void) {
-#         vec4 srgb = texture2D(texture0, tex_coord0);
-#         gl_FragColor = vec4(1., 0., 0., 1.); //to_linear(srgb.rgb), srgb.w);
-#     }
-#     '''
-#     with fbo:
-#         Color(1, 1, 1)
-#         Rectangle(size=texture.size, texture=texture, tex_coords=texture.tex_coords)
-#     fbo.draw()
-
-#     return fbo.texture
-
-# def radial_gradient(border_color=(1, 1, 0), center_color=(1, 0, 0),
-#         size=(64, 64)):
-
-#     fbo = Fbo(size=size, clear_color=(.1, 1, .2, 1))
-#     fbo.shader.fs = '''
-#     $HEADER$
-#     uniform vec3 border_color;
-#     uniform vec3 center_color;
-#     void main (void) {
-#         float d = clamp(distance(tex_coord0, vec2(0.5, 0.5)), 0., 1.);
-#         gl_FragColor = vec4(1., 1., 0., 1.); //vec4(mix(center_color, border_color, d), 1);
-#     }
-#     '''
-
-#     # use the shader on the entire surface
-#     fbo['border_color'] = list(map(float, border_color))
-#     fbo['center_color'] = list(map(float, center_color))
-#     with fbo:
-#         ClearColor(1, 1, 1, 1)
-#         ClearBuffers()
-#         Color(1, 1, 0)
-#         Rectangle(size=size)
-#     fbo.draw()
-
-#     return fbo.texture
-
-
-# def create_tex(*args):
-#     center_color = 255, 255, 0
-#     border_color = 100, 0, 0
-
-#     size = (64, 64)
-#     tex = Texture.create(size=size)
-
-#     sx_2 = size[0] // 2
-#     sy_2 = size[1] // 2
-
-#     buf = bytearray()
-#     for x in range(-sx_2, sx_2):
-#         for y in range(-sy_2, sy_2):
-#             a = x / (1.0 * sx_2)
-#             b = y / (1.0 * sy_2)
-#             d = (a ** 2 + b ** 2) ** .5
-
-#             for c in (0, 1, 2):
-#                 buf += bytearray((max(0,
-#                                min(255,
-#                                    int(center_color[c] * (1 - d)) +
-#                                    int(border_color[c] * d))),))
-
-#     tex.blit_buffer(bytes(buf), colorfmt='rgb', bufferfmt='ubyte')
-#     return tex
-
-
-
-# grace_hopper.texture = texture_to_linear_srgb(grace_hopper.texture)
-# glFinish()
-# grad = radial_gradient()
-# glFinish()
-# print('GRAD', grad, grad.tex_coords)
 
 def debounce(wait):
     """ Decorator that will postpone a functions
@@ -274,13 +182,13 @@ class CodeEditor(CodeInput, FocusBehavior):
         self.background_color = bg_color + (alpha or 1,)
         self._trigger_refresh_text()
 
-#    def _get_bbcode(self, ntext):
-#        print('_get_bbcode', ntext)
-#        return super(CodeEditor, self)._get_bbcode(ntext)
+    # def _get_bbcode(self, ntext):
+    #     print('_get_bbcode', ntext)
+    #     return super(CodeEditor, self)._get_bbcode(ntext)
 
-#    def _create_line_label(self, text, hint=False):
-#        print('_create_line_label', text, hint)
-#        return super(CodeEditor, self)._create_line_label(text, hint)
+    # def _create_line_label(self, text, hint=False):
+    #     print('_create_line_label', text, hint)
+    #     return super(CodeEditor, self)._create_line_label(text, hint)
 
     def highlight_line(self, line_num, style='error', add=False):
         if line_num:
@@ -976,75 +884,44 @@ class OurSandbox(FocusBehavior, ScatterPlane):
 #        self.pos = Vector(*self.velocity) + self.pos
 
 
-class MapViewer(StencilView):
+class Scene(StencilView):
     def on_touch_down(self, touch):
         if not self.collide_point(*touch.pos):  # touch is not within bounds
             return False
-        return super(MapViewer,
+        return super(Scene,
                      self).on_touch_down(touch)  # delegate to stencil
 
     def on_touch_move(self, touch):
         if not self.collide_point(*touch.pos):  # touch is not within bounds
             return False
-        return super(MapViewer,
+        return super(Scene,
                      self).on_touch_move(touch)  # delegate to stencil
 
     def on_touch_up(self, touch):
         if not self.collide_point(*touch.pos):
             return False
-        return super(MapViewer, self).on_touch_up(touch)
+        return super(Scene, self).on_touch_up(touch)
 
 
 class Playground(FloatLayout):
 
-#for i in range(10*n):
-#    pensize(i/50)
-#    color(sin(i/m)/2+0.5,cos(i/m)/2+0.5,b/10+1)
-#    goto(300*sin(i/(a*5)), 300*cos(i/15))
-#    pendown()
-# forward(100)
-# right(45)
-# forward(70)
-# bob = Turtle()
-# bob.color('yellow')
-# bob.left(45)
-# bob.forward(390)
-# bob.pensize(3)
 
-# im = cam16.from_xyz100(srgb.to_xyz100(srgb.from_srgb1(image.reshape((image.shape[0] * image.shape[1], 3)).T)))[[True, True,False,True,False,False,False]].T.reshape(image.shape)
-# im[...,2] += a
-# im[...,2] %= 400
-# image_sr = srgb.to_srgb1(srgb.from_xyz100(cam16.to_xyz100(im.reshape((image.shape[0] * image.shape[1], 3)).T,'JCh'))).T
-# img.set_image(image_sr)
-# im = img.imc16.copy()
+    code = StringProperty() # '''ball = add_sprite('circle', x=0, y=-120, body_type=0, color='green')
+    # ball.apply_impulse((50000, 0))
 
-# import numpy as np
-# im = np.array([img.imc16[...,0].T, img.imc16[...,5].T, img.imc16[...,3].T]).T
-# im[...,2] += a
-# im[...,2] %= 360
-# im[...,1] *= b
-# im[...,0] *= c
-# img.set_imc16(im, 'Jsh')
-# def update():
-#   pass
+    # platform = add_sprite('platform', x=250, y=-120, body_type=1, color='red')
+    # def on_key_press(key, modifiers):
+    #     if key == 'up':
+    #         platform.velocity += 0, 15
+    #     if key == 'down':
+    #         platform.velocity -= 0, 15
 
+    #     print(key, modifiers)
 
-    code = StringProperty('''ball = add_sprite('circle', x=0, y=-120, body_type=0, color='green')
-ball.apply_impulse((50000, 0))
+    # def update(dt):
+    #     pass
 
-platform = add_sprite('platform', x=250, y=-120, body_type=1, color='red')
-def on_key_press(key, modifiers):
-    if key == 'up':
-        platform.velocity += 0, 15
-    if key == 'down':
-        platform.velocity -= 0, 15
-
-    print(key, modifiers)
-
-def update(dt):
-    pass
-
-''')
+    # ''')
 
     vars = DictProperty({})
 

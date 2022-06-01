@@ -29,7 +29,7 @@ from kivy.properties import StringProperty, NumericProperty, ListProperty, Objec
 from kivy.clock import Clock
 from kivy.resources import resource_add_path
 
-from ouruix import CodeEditor, Ball, OurSandbox, MapViewer, Playground, VarSlider
+from ouruix import CodeEditor, Ball, OurSandbox, Scene, Playground, VarSlider
 
 class PlaygroundApp(App):
     def build(self):
@@ -38,14 +38,14 @@ class PlaygroundApp(App):
 
         LabelBase.register(
             DEFAULT_FONT,
-            'fonts/FiraSans-Regular.ttf',
-            'fonts/FiraSans-Italic.ttf',
-            'fonts/FiraSans-Bold.ttf',
-            'fonts/FiraSans-BoldItalic.ttf')
+            '../fonts/FiraSans-Regular.ttf',
+            '../fonts/FiraSans-Italic.ttf',
+            '../fonts/FiraSans-Bold.ttf',
+            '../fonts/FiraSans-BoldItalic.ttf')
 
         LabelBase.register(
             'Fira Code',
-            'fonts/FiraCode-Regular.ttf')
+            '../fonts/FiraCode-Regular.ttf')
             # fn_bold='fonts/FiraCode-Bold.ttf')
 
         kwargs = {}
