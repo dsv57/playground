@@ -29,7 +29,15 @@ from kivy.properties import StringProperty, NumericProperty, ListProperty, Objec
 from kivy.clock import Clock
 from kivy.resources import resource_add_path
 
-from ouruix import CodeEditor, Ball, OurSandbox, Scene, Playground, VarSlider
+# from ouruix import CodeEditor, OurSandbox, Scene, Playground, VarSlider
+from uix.code_editor import CodeEditor
+from uix.our_sandbox import OurSandbox
+from uix.playground import Playground
+from uix.var_slider import VarSlider
+from uix.scene import Scene
+from uix.action_step_slider import ActionStepSlider
+# from uix. import 
+
 
 class PlaygroundApp(App):
     def build(self):
