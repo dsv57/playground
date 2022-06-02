@@ -3,20 +3,21 @@ import inspect
 from .level import Level
 from sprite import Sprite
 
+
 class CannotGo(Exception):
     pass
 
-class Sokoban:
 
-    def __init__(self, level=1, level_set='our', trace=True):
-        wall = 'sokoban/images/wall.png'
-        box = 'sokoban/images/box.png'
-        box_on_target = 'sokoban/images/box_on_target.png'
-        space = 'sokoban/images/space.png'
-        target = 'sokoban/images/target.png'
-        player = 'sokoban/images/player.png'
+class Sokoban:
+    def __init__(self, level=1, level_set="our", trace=True):
+        wall = "sokoban/images/wall.png"
+        box = "sokoban/images/box.png"
+        box_on_target = "sokoban/images/box_on_target.png"
+        space = "sokoban/images/space.png"
+        target = "sokoban/images/target.png"
+        player = "sokoban/images/player.png"
         # player = 'sokoban/images/beetle-robot.png'
-        self._images = {'#': wall, ' ': space, '$': box, '.': target, '@': player, '*': box_on_target}
+        self._images = {"#": wall, " ": space, "$": box, ".": target, "@": player, "*": box_on_target}
         self._tiles = None
         self._do_trace = trace
         self.load_level(level, level_set)
@@ -79,9 +80,9 @@ class Sokoban:
                     image = tile.shapes[0]
                     if image.source != images[c]:
                         image.source = images[c]
-                        print('Update:', image.source, images[c])
+                        print("Update:", image.source, images[c])
                 else:
-                    tile = Sprite(images[c], x=36*j, y=36*i, trace=False)
+                    tile = Sprite(images[c], x=36 * j, y=36 * i, trace=False)
                     self._tiles[-1].append(tile)
                     layout.add_widget(tile)
 
@@ -96,10 +97,10 @@ class Sokoban:
                 while f is not None:
                     filename = f.f_code.co_filename
                     lineno = f.f_lineno
-                    if depth > 4 and filename != '<code-input>':
+                    if depth > 4 and filename != "<code-input>":
                         break
                     # print('depth', depth, filename, lineno)
-                    if filename == '<code-input>':
+                    if filename == "<code-input>":
                         trace.append(lineno)
                     depth += 1
                     f = f.f_back
@@ -109,7 +110,7 @@ class Sokoban:
         target_found = self._target_found
         matrix = level.get_matrix()
         # for row in reversed(matrix):
-            # print(''.join(row))
+        # print(''.join(row))
 
         level.add_to_history(matrix)
 
@@ -124,18 +125,18 @@ class Sokoban:
             orig_tile = matrix[y][x]
             next_tile = matrix[y + dy][x + dx]
             if len(matrix) <= y + 2 * dy:
-                second_tile = '#'
+                second_tile = "#"
             elif len(matrix[y + 2 * dy]) <= x + 2 * dx:
-                second_tile = '#'
+                second_tile = "#"
             else:
                 second_tile = matrix[y + 2 * dy][x + 2 * dx]
-            if next_tile in ' .':
+            if next_tile in " .":
                 pass
-            elif next_tile in '$*':
-                if second_tile == ' ':
-                    second_tile = '$'
-                elif second_tile == '.':
-                    second_tile = '*'
+            elif next_tile in "$*":
+                if second_tile == " ":
+                    second_tile = "$"
+                elif second_tile == ".":
+                    second_tile = "*"
                 else:
                     if not nolog:
                         log.pop()
@@ -146,13 +147,13 @@ class Sokoban:
                 raise CannotGo
 
             if target_found is True:
-                orig_tile = '.'
+                orig_tile = "."
                 target_found = False
             else:
-                orig_tile = ' '
-            if next_tile in '.*':
+                orig_tile = " "
+            if next_tile in ".*":
                 target_found = True
-            next_tile = '@'
+            next_tile = "@"
             self._player_pos = (x + dx, y + dy)
 
             self._target_found = target_found
@@ -170,10 +171,10 @@ class Sokoban:
         # print("Boxes remaining: " + str(len(level.get_boxes())))
         # return len(level.get_boxes()) == 0
         # if len(level.get_boxes()) == 0:
-            # print("Level Completed")
-            # self.load_level(self._level_number + 1)
-            # self.sandbox.clear_widgets()
-            # self.draw_level()
+        # print("Level Completed")
+        # self.load_level(self._level_number + 1)
+        # self.sandbox.clear_widgets()
+        # self.draw_level()
 
     @property
     def boxes_remaining(self):

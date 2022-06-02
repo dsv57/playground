@@ -1,13 +1,13 @@
 from copy import deepcopy
 
-class Level:
 
+class Level:
     def __init__(self, level_set, level_num):
         self.matrix = []
         self.matrix_history = []
-        
+
         # Create level
-        with open(f'sokoban/levels/{level_set}/level{level_num}', 'r') as f:
+        with open(f"sokoban/levels/{level_set}/level{level_num}", "r") as f:
             for row in f.read().splitlines():
                 self.matrix.append(list(row))
 
@@ -47,4 +47,3 @@ class Level:
 
     def get_size(self):
         return (max([len(row) for row in self.matrix]), len(self.matrix))
-

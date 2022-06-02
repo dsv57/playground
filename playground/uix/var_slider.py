@@ -5,18 +5,18 @@ from kivy.properties import StringProperty, NumericProperty, OptionProperty
 
 
 class VarSlider(GridLayout):
-    var_name = StringProperty('a')
+    var_name = StringProperty("a")
     value = NumericProperty(0)
     min = NumericProperty(-10)
     max = NumericProperty(10)
     step = NumericProperty(0.01)
-    type = OptionProperty('int', options=['float', 'int'])
+    type = OptionProperty("int", options=["float", "int"])
 
     _VALID_ID = re.compile(r"^[^\d\W]\w*")
 
     def _to_numtype(self, v):
         try:
-            if self.type == 'float':
+            if self.type == "float":
                 return round(float(v), 1)
             else:
                 return int(v)
@@ -24,8 +24,8 @@ class VarSlider(GridLayout):
             return self.min
 
     def _str(self, v):
-        if self.type == 'float':
-            return '{:.1f}'.format(v)
+        if self.type == "float":
+            return "{:.1f}".format(v)
         else:
             return str(v)
 

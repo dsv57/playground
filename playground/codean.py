@@ -5,7 +5,7 @@ import ast
 import linecache
 from traceback import TracebackException, FrameSummary
 from io import StringIO
-from sys import getsizeof, exc_info #, modules
+from sys import getsizeof, exc_info  # , modules
 from copy import deepcopy
 from collections import defaultdict
 from contextlib import redirect_stdout, redirect_stderr
@@ -15,30 +15,31 @@ import jedi
 _MAX_VAR_SIZE = 4096
 jedi.settings.add_bracket_after_function = True
 jedi.settings.case_insensitive_completion = False
-jedi.preload_module('ourturtle')
+jedi.preload_module("ourturtle")
 
 from astor import dump_tree, to_source
+
 
 def autocomp(src, namespace, lineno, column):
     try:
         completions = jedi.Interpreter(
-            'from ourturtle import Turtle\n' + src, [namespace],
-            line=lineno + 1 + 1,
-            column=column).completions()
+            "from ourturtle import Turtle\n" + src, [namespace], line=lineno + 1 + 1, column=column
+        ).completions()
         return completions
     except:
         return []
 
-COMMON_CODE='<common>'
+
+COMMON_CODE = "<common>"
 
 # Compileable: ast.Module([node for node in ast.parse(source).body if node.lineno <= 6])
 
 ## Print globals (vars only)
-#for k, v in globals().copy().items():
+# for k, v in globals().copy().items():
 #    if any([isinstance(v, t) for t in [int, float, str, dict, tuple]]) and k[0] != '_':
 #        print(k, type(v), repr(v)[:80], sep='\t')
 
-#sys.getsizeof
+# sys.getsizeof
 
 # Fix FrameSummary: store locals as it is, without doing repr().
 
@@ -70,10 +71,8 @@ _vars = defaultdict(lambda: defaultdict(list))
 def dump_vars(v, lineno):
     global _vars
     for k, v in v.copy().items():
-        if any([isinstance(v, t)
-                for t in [int, float, str, dict, tuple]]) and k[0] != '_':
-            _vars[lineno][k].append(
-                v if getsizeof(v) <= MAX_VAR_SIZE else '<LARGE>')
+        if any([isinstance(v, t) for t in [int, float, str, dict, tuple]]) and k[0] != "_":
+            _vars[lineno][k].append(v if getsizeof(v) <= MAX_VAR_SIZE else "<LARGE>")
     # print('dump_vars', lineno)
 
 
@@ -82,7 +81,7 @@ def compare_ast(node1, node2):
         return False
     if isinstance(node1, ast.AST):
         for k, v in vars(node1).items():
-            if k in ('lineno', 'col_offset', 'ctx', '_pp', '_precedence', '_use_parens', '_p_op'):
+            if k in ("lineno", "col_offset", "ctx", "_pp", "_precedence", "_use_parens", "_p_op"):
                 continue
             if not compare_ast(v, getattr(node2, k, None)):
                 return False
@@ -94,7 +93,8 @@ def compare_ast(node1, node2):
     else:
         return node1 == node2
 
-TRACE_MAX_DEPTH=12
+
+TRACE_MAX_DEPTH = 12
 
 # dump ast.parse('dump_vars(locals(), n.lineno)').body[0]
 
@@ -109,17 +109,16 @@ class Tracer2(ast.NodeTransformer):
         def tracer_ast(lineno):
             return ast.Expr(
                 value=ast.Call(
-                    func=ast.Name(id='dump_vars', ctx=ast.Load()),
+                    func=ast.Name(id="dump_vars", ctx=ast.Load()),
                     args=[
-                        ast.Call(
-                            func=ast.Name(id='locals', ctx=ast.Load()),
-                            args=[],
-                            keywords=[]),
-                        ast.Num(n.lineno)
+                        ast.Call(func=ast.Name(id="locals", ctx=ast.Load()), args=[], keywords=[]),
+                        ast.Num(n.lineno),
                     ],
-                    keywords=[]))
+                    keywords=[],
+                )
+            )
 
-        if hasattr(node, 'body'):
+        if hasattr(node, "body"):
             new_body = []
             prev_lineno = -1
             for i, n in enumerate(node.body):
@@ -144,28 +143,29 @@ class AddBreak(ast.NodeTransformer):
 
     def visit(self, node):
         def break_ast(lineno):
-            return ast.Raise(
-                exc=ast.Name(id='Break', ctx=ast.Load()), cause=None)
+            return ast.Raise(exc=ast.Name(id="Break", ctx=ast.Load()), cause=None)
 
-        if not self.done and hasattr(node, 'body'):  # FIXME and node.lineno <= self.lineno: # FIXME and node.body[-1].lineno >= self.lineno:
+        if not self.done and hasattr(
+            node, "body"
+        ):  # FIXME and node.lineno <= self.lineno: # FIXME and node.body[-1].lineno >= self.lineno:
             new_body = []
             for i, child in enumerate(node.body):
                 new_body.append(self.visit(child))
-                if not self.done and child.lineno >= self.lineno:  # or (not self.done and child.lineno >= self.lineno):  # child.lineno >= self.lineno:
+                if (
+                    not self.done and child.lineno >= self.lineno
+                ):  # or (not self.done and child.lineno >= self.lineno):  # child.lineno >= self.lineno:
                     self.done = True
-                    newchild = ast.copy_location(
-                        break_ast(child.lineno), child)
+                    newchild = ast.copy_location(break_ast(child.lineno), child)
                     new_body.append(newchild)
             node.body = new_body
 
-        if not self.done and hasattr(node, 'orelse'):
+        if not self.done and hasattr(node, "orelse"):
             new_orelse = []
             for i, child in enumerate(node.orelse):
                 new_orelse.append(self.visit(child))
                 if not self.done and child.lineno >= self.lineno:
                     self.done = True
-                    newchild = ast.copy_location(
-                        break_ast(child.lineno), child)
+                    newchild = ast.copy_location(break_ast(child.lineno), child)
                     new_orelse.append(newchild)
             node.orelse = new_orelse
         return node
@@ -185,9 +185,7 @@ class VarLister(ast.NodeVisitor):
 
 
 class CodeRunner:
-
-    def __init__(self, source=None, name='<code-input>', globals=None,
-                 special_funcs=None):
+    def __init__(self, source=None, name="<code-input>", globals=None, special_funcs=None):
         self._name = name
         self._special_funcs = special_funcs or []
         self._ast = {}
@@ -195,7 +193,7 @@ class CodeRunner:
         self._common_vars = set()
         self._globals = {}
         self._breakpoint = None
-        self.default_globals = {'Break': Break}
+        self.default_globals = {"Break": Break}
         self.default_globals.update(globals or {})
         self.text_stream = StringIO()
         self.reset(source)
@@ -229,7 +227,7 @@ class CodeRunner:
     def exception_lineno(self, exc_obj):
         exc_tb = exc_obj.__traceback__
         lineno = None
-        if hasattr(exc_obj, 'lineno'):
+        if hasattr(exc_obj, "lineno"):
             # print('exc_obj', exc_obj.lineno, exc_obj.filename)
             lineno = exc_obj.lineno
 
@@ -239,7 +237,6 @@ class CodeRunner:
             exc_tb = exc_tb.tb_next
 
         return lineno
-
 
     def _trace(self, tb, max_depth=4):
         out = []
@@ -269,7 +266,7 @@ class CodeRunner:
                 if not line:
                     lines = self._source.splitlines()
                     if len(lines) >= lineno:
-                        line = lines[lineno-1].strip()
+                        line = lines[lineno - 1].strip()
                 out.append((filename, lineno, name, line, locals_copy))
             depth += 1
             tb = tb.tb_next
@@ -332,10 +329,10 @@ class CodeRunner:
         codeobjs = self._codeobjs
         if parts is None:
             parts = self._ast.keys()
-        print('COMPILE:', parts)
+        print("COMPILE:", parts)
         for p in parts:
             codeobjs.pop(p, None)
-            codeobjs[p] = compile(self._ast[p], self._name, 'exec', **kvargs)
+            codeobjs[p] = compile(self._ast[p], self._name, "exec", **kvargs)
 
     def execute(self, parts=None):
         if self.text_stream.closed:
@@ -345,10 +342,10 @@ class CodeRunner:
         if parts is None:  # Preserving order: common first.
             parts = [COMMON_CODE] + list(set(self._ast.keys()) - set([COMMON_CODE]))
         # if COMMON_CODE in parts:
-        print('EXECUTE', parts)
+        print("EXECUTE", parts)
 
         for p in parts:
-            print('exec', p)
+            print("exec", p)
             if p not in cobjs:
                 self.compile(p)
             try:
@@ -363,7 +360,7 @@ class CodeRunner:
             #     return False
 
             except Exception as e:
-                if hasattr(e, 'message'):
+                if hasattr(e, "message"):
                     e_str = e.message
                 else:
                     e_str = str(e) or e.__class__.__name__
@@ -371,19 +368,19 @@ class CodeRunner:
                 self.exception = (e, e_str, tb)
                 return False
             # else:
-                # self.traceback = None
+            # self.traceback = None
 
         return True
 
     def call(self, func, *args, **kvargs):
         # if func not in self._globals:
-            # raise NameError(f"name {repr(func)} is not defined")
+        # raise NameError(f"name {repr(func)} is not defined")
         try:
             with redirect_stdout(self.text_stream):
                 with redirect_stderr(self.text_stream):
                     return self._globals[func](*args, **kvargs)
         except Exception as e:
-            if hasattr(e, 'message'):
+            if hasattr(e, "message"):
                 e_str = e.message
             else:
                 e_str = str(e) or e.__class__.__name__
@@ -393,7 +390,6 @@ class CodeRunner:
 
         # except Break:
         #     print("* Break *")
-
 
     def call_if_exists(self, func, *args, **kvargs):
         if func in self._globals:
@@ -428,7 +424,6 @@ class CodeRunner:
         # else:
         #     self.init_editor.highlight_line(None)
         #     self.trigger_exec_init()
-
 
 
 # https://greentreesnakes.readthedocs.io/en/latest/
