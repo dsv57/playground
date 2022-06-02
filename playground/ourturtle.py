@@ -1,5 +1,5 @@
 #! /usr/bin/python3
-'''
+"""
 Copyright (C) 2005 Aaron Spike, aaron@ekips.org
 
 This program is free software; you can redistribute it and/or modify
@@ -15,7 +15,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-'''
+"""
 
 # import traceback
 
@@ -37,7 +37,7 @@ class Turtle:
     def reset(self):
         self._shown = True
         self._drawing = True
-        self._pencolor = (.4, .4, 1)  # COLORS['black']
+        self._pencolor = (0.4, 0.4, 1)  # COLORS['black']
         self._pensize = 1
         self._shapesize = 1
 
@@ -52,23 +52,21 @@ class Turtle:
     def _new_line(self):
         if self._lines and len(self._lines[-1][2]) < 3:
             self._lines.pop()
-        self._lines.append((self._pencolor, self._pensize,
-                            list(self._position)))
+        self._lines.append((self._pencolor, self._pensize, list(self._position)))
 
     def dot(self, r=15, color=None):
         if not color:
             color = self._pencolor
         else:
             color = self._color(color)
-        self._stamps.append(('Ellipse', self._position, (r, r), color))
+        self._stamps.append(("Ellipse", self._position, (r, r), color))
 
     def rect(self, w=25, h=25, color=None):
         if not color:
             color = self._pencolor
         else:
             color = self._color(color)
-        self._stamps.append(('Rectangle', self._position, (float(w), float(h)),
-                             color))
+        self._stamps.append(("Rectangle", self._position, (float(w), float(h)), color))
 
     def shapesize(self, size):
         self._shapesize = float(size)
@@ -89,7 +87,8 @@ class Turtle:
         self._drawing = False
         if self._lines and len(self._lines[-1][2]) == 2:
             self._lines.pop()
-#        self._new = False
+
+    #        self._new = False
 
     def pendown(self):
         if not self._drawing:
@@ -122,8 +121,8 @@ class Turtle:
         self.goto(0, 0)
         self._orient = Vec2d(1, 0)
 
-#    def clean(self):
-#        self._path = ''
+    #    def clean(self):
+    #        self._path = ''
 
     def clear(self):
         self.clean()
@@ -139,12 +138,13 @@ class Turtle:
             self._goto(Vec2d(*map(float, x)))
         else:
             self._goto(Vec2d(float(x), float(y)))
-#        if self.__new:
-#            self.__path += "M"+",".join([str(i) for i in self.__pos])
-#            self.__new = False
-#        self.__pos = [x, y]
-#        if self.__draw:
-#            self.__path += "L"+",".join([str(i) for i in self.__pos])
+
+    #        if self.__new:
+    #            self.__path += "M"+",".join([str(i) for i in self.__pos])
+    #            self.__new = False
+    #        self.__pos = [x, y]
+    #        if self.__draw:
+    #            self.__path += "L"+",".join([str(i) for i in self.__pos])
 
     def position(self):
         return self._position
@@ -191,14 +191,13 @@ class Turtle:
         if len(color) == 1 and isinstance(color[0], (tuple, list)):
             color = color[0]
 
-        if len(color) in [3, 4] \
-                and all([isinstance(c, (float, int)) for c in color]):
+        if len(color) in [3, 4] and all([isinstance(c, (float, int)) for c in color]):
             return color
         elif len(color) == 1 and isinstance(color[0], str):
             color = color[0]
-            if color.startswith('#'):
+            if color.startswith("#"):
                 if len(color) == 7:
-                    return [int(color[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+                    return [int(color[i : i + 2], 16) / 255 for i in (1, 3, 5)]
                 elif len(color) == 4:
                     return [16 * int(h, 16) / 255 for h in color[1:]]
             elif color in COLORS:

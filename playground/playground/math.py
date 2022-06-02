@@ -2,8 +2,22 @@ import math
 
 
 __all__ = [
-	'sin', 'cos', 'tan', 'arcsin', 'arccos', 'arctan', 'arctan2', 'to_radians',
-	'to_degrees', 'floor', 'ceil', 'gcd', 'log', 'isnan', 'hypot', 'trunc'
+    "sin",
+    "cos",
+    "tan",
+    "arcsin",
+    "arccos",
+    "arctan",
+    "arctan2",
+    "to_radians",
+    "to_degrees",
+    "floor",
+    "ceil",
+    "gcd",
+    "log",
+    "isnan",
+    "hypot",
+    "trunc",
 ]
 
 

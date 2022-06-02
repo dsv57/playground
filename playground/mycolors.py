@@ -1,9 +1,8 @@
-#from math import *
-#from turtle import *
+# from math import *
+# from turtle import *
 
 import numpy as np
-from numpy import sin, cos, arctan2 as atan2, \
-                  sqrt, ceil, floor, degrees, radians, log, pi, exp, transpose
+from numpy import sin, cos, arctan2 as atan2, sqrt, ceil, floor, degrees, radians, log, pi, exp, transpose
 from colorio import CIELAB, CAM16UCS, CAM16, JzAzBz, SrgbLinear
 
 L_A = 64 / pi / 5
@@ -13,37 +12,48 @@ cam16 = CAM16(0.69, 20, L_A)
 cam16ucs = CAM16UCS(0.69, 20, L_A)
 jzazbz = JzAzBz()
 
-NEUTRAL = '#262626'
+NEUTRAL = "#262626"
+
 
 def lab_to_srgb(color):
     return transpose(srgb.to_srgb1(srgb.from_xyz100(lab.to_xyz100(transpose(color)))))
 
+
 def jzazbz_to_srgb(color):
     return transpose(srgb.to_srgb1(srgb.from_xyz100(jzazbz.to_xyz100(transpose(color)))))
+
 
 def srgb_to_lab(color):
     return transpose(lab.from_xyz100(srgb.to_xyz100(srgb.from_srgb1(transpose(color)))))
 
+
 def srgb_to_jzazbz(color):
     return transpose(jzazbz.from_xyz100(srgb.to_xyz100(srgb.from_srgb1(transpose(color)))))
+
 
 def lab_to_jzazbz(color):
     return transpose(jzazbz.from_xyz100(lab.to_xyz100(transpose(color))))
 
+
 def lab_to_cam16ucs(color):
     return transpose(cam16ucs.from_xyz100(lab.to_xyz100(transpose(color))))
+
 
 def jzazbz_to_lab(color):
     return transpose(lab.from_xyz100(jzazbz.to_xyz100(transpose(color))))
 
+
 def cam16ucs_to_srgb(color):
     return transpose(srgb.to_srgb1(srgb.from_xyz100(cam16ucs.to_xyz100(transpose(color)))))
+
 
 def srgb_to_cam16ucs(color):
     return transpose(cam16ucs.from_xyz100(srgb.to_xyz100(srgb.from_srgb1(transpose(color)))))
 
-def cam16_to_srgb(color, description='JCh'):
+
+def cam16_to_srgb(color, description="JCh"):
     return transpose(srgb.to_srgb1(srgb.from_xyz100(cam16.to_xyz100(transpose(color), description))))
+
 
 def srgb_to_cam16(color):
     return transpose(cam16.from_xyz100(srgb.to_xyz100(srgb.from_srgb1(transpose(color)))))
@@ -51,8 +61,8 @@ def srgb_to_cam16(color):
 
 
 def _square_plot(l, k1, k2, conv, d=30):
-    for x in range(-300,301,d):
-        for y in range(-300,301,d):
+    for x in range(-300, 301, d):
+        for y in range(-300, 301, d):
             goto(x, y)
             c = conv(l, x * k1, y * k2)
             if np.max(c) > 1.0 or np.min(c) < 0.0 or np.isnan(c).any():
@@ -61,21 +71,25 @@ def _square_plot(l, k1, k2, conv, d=30):
                 tc = tuple(map(float, c))
             dot(d, tc)
     update()
+
 
 def plot_lab(l=73, r=30):
-    _square_plot(l, 1/4, 1/4, lab_to_srgb, r)
+    _square_plot(l, 1 / 4, 1 / 4, lab_to_srgb, r)
+
 
 def plot_cam16ucs(j=75, r=30):
-    _square_plot(j, 1/10, 1/10, cam16ucs_to_srgb, r)
+    _square_plot(j, 1 / 10, 1 / 10, cam16ucs_to_srgb, r)
+
 
 def plot_jzazbz(jz=0.12, r=30):
-    _square_plot(jz, 1/3000, 1/3000, jzazbz_to_srgb, r)
+    _square_plot(jz, 1 / 3000, 1 / 3000, jzazbz_to_srgb, r)
+
 
 def _diag_plot(l, k1, k2, conv, d=30):
-    x_step = int(round(tan(pi/3) * d/2))+1
-    for x in range(-300,301,x_step):
-        offset = (x//x_step) % 2 * d//2
-        for y in range(-300+offset, 301+offset,d+1):
+    x_step = int(round(tan(pi / 3) * d / 2)) + 1
+    for x in range(-300, 301, x_step):
+        offset = (x // x_step) % 2 * d // 2
+        for y in range(-300 + offset, 301 + offset, d + 1):
             goto(x, y)
             c = conv(l, x * k1, y * k2)
             if np.max(c) > 1.0 or np.min(c) < 0.0 or np.isnan(c).any():
@@ -85,23 +99,27 @@ def _diag_plot(l, k1, k2, conv, d=30):
             dot(d, tc)
     update()
 
+
 def dplot_lab(l=73, d=30):
-    _diag_plot(l, 1/4, 1/4, lab_to_srgb, d)
+    _diag_plot(l, 1 / 4, 1 / 4, lab_to_srgb, d)
+
 
 def dplot_cam16ucs(j=75, d=30):
-    _diag_plot(j, 1/10, 1/10, cam16ucs_to_srgb, d)
+    _diag_plot(j, 1 / 10, 1 / 10, cam16ucs_to_srgb, d)
+
 
 def dplot_jzazbz(jz=0.12, d=30):
-    _diag_plot(jz, 1/3000, 1/3000, jzazbz_to_srgb, d)
+    _diag_plot(jz, 1 / 3000, 1 / 3000, jzazbz_to_srgb, d)
+
 
 def _radial_plot(l, k1, k2, conv, big=True):
-    for i in range(1,40,3 if big else 2):
+    for i in range(1, 40, 3 if big else 2):
         r = 10 * i
-        points = i*(2 if big else 3)
+        points = i * (2 if big else 3)
         for j in range(points):
-            angle = 2*pi * j/points
-            x = r*cos(angle)
-            y = r*sin(angle)
+            angle = 2 * pi * j / points
+            x = r * cos(angle)
+            y = r * sin(angle)
             goto(x, y)
             c = conv(l, x * k1, y * k2)
             if np.max(c) > 1.0 or np.min(c) < 0.0 or np.isnan(c).any():
@@ -111,25 +129,30 @@ def _radial_plot(l, k1, k2, conv, big=True):
             dot(29 if big else 19, tc)
     update()
 
+
 def rplot_lab(l=73, big=True):
-    _radial_plot(l, 1/4, 1/4, lab_to_srgb, big)
+    _radial_plot(l, 1 / 4, 1 / 4, lab_to_srgb, big)
+
 
 def rplot_jzazbz(jz=0.12, big=True):
-    _radial_plot(jz, 1/3000, 1/3000, jzazbz_to_srgb, big)
+    _radial_plot(jz, 1 / 3000, 1 / 3000, jzazbz_to_srgb, big)
+
 
 def rplot_cam16ucs(j=75, big=True):
-    _radial_plot(j, 1/10, 1/10, cam16ucs_to_srgb, big)
+    _radial_plot(j, 1 / 10, 1 / 10, cam16ucs_to_srgb, big)
+
 
 def to_radians(a):
     return a / 180 * pi
+
 
 def bright_jzazbz(jz, angle, steps=100):
     prev_c = None
     r = 0
     for i in range(50000):
         r += 0.1 / steps
-        x = r*cos(to_radians(angle))
-        y = r*sin(to_radians(angle))
+        x = r * cos(to_radians(angle))
+        y = r * sin(to_radians(angle))
         c = jzazbz_to_srgb((jz, x, y))
         if np.max(c) > 1.0 or np.min(c) < 0.0 or np.isnan(c).any():
             print(i)
@@ -137,50 +160,59 @@ def bright_jzazbz(jz, angle, steps=100):
         else:
             prev_c = c
 
+
 def bright_cam16ucs(j, angle, steps=100):
     prev_c = None
     r = 0
     for i in range(50000):
         r += 30 / steps
-        a = r*cos(to_radians(angle))
-        b = r*sin(to_radians(angle))
+        a = r * cos(to_radians(angle))
+        b = r * sin(to_radians(angle))
         c = cam16ucs_to_srgb((j, a, b))
         if np.max(c) > 1.0 or np.min(c) < 0.0 or np.isnan(c).any():
-            #print(i)
+            # print(i)
             return prev_c
         else:
             prev_c = c
 
+
 # !!!
 def show_jzazbz_hues():
-    for j in range(0,11):
+    for j in range(0, 11):
         steps = 32
-        if j == 0: steps = 4
-        if j == 1: steps = 8
-        if j == 2: steps = 16
+        if j == 0:
+            steps = 4
+        if j == 1:
+            steps = 8
+        if j == 2:
+            steps = 16
         for i in range(steps):
-            r = 20 + 50*j
-            angle = 360 * i/steps
-            goto(r*cos(to_radians(angle)), r*sin(to_radians(angle)))
-            dot(50, tuple(map(float,bright_jzazbz(0.05 + j/100, angle))))
+            r = 20 + 50 * j
+            angle = 360 * i / steps
+            goto(r * cos(to_radians(angle)), r * sin(to_radians(angle)))
+            dot(50, tuple(map(float, bright_jzazbz(0.05 + j / 100, angle))))
             update()
+
 
 def show_cam16ucs_hues():
-    for j in range(1,10):
+    for j in range(1, 10):
         steps = 32
-        if j == 0: steps = 4
-        if j == 1: steps = 8
-        if j == 2: steps = 16
+        if j == 0:
+            steps = 4
+        if j == 1:
+            steps = 8
+        if j == 2:
+            steps = 16
         for i in range(steps):
-            r = 20 + 50*j
-            angle = 360 * i/steps
-            goto(r*cos(to_radians(angle)), r*sin(to_radians(angle)))
-            dot(50, tuple(map(float,bright_cam16ucs(j*10, angle))))
+            r = 20 + 50 * j
+            angle = 360 * i / steps
+            goto(r * cos(to_radians(angle)), r * sin(to_radians(angle)))
+            dot(50, tuple(map(float, bright_cam16ucs(j * 10, angle))))
             update()
 
 
-#clear()
-#for i in range(1,40,3 if big else 2):
+# clear()
+# for i in range(1,40,3 if big else 2):
 #    r = 10 * i
 #    points = i*(2 if big else 3)
 #    for j in range(points):
@@ -191,8 +223,8 @@ def show_cam16ucs_hues():
 #        dot(29 if big else 19, tuple(map(float,bright_jzazbz(0.04 + i/400, angle))))
 #    update()
 
-#x_step = int(round(tan(pi/3) * d/2))+1
-#for x in range(-300,301,x_step):
+# x_step = int(round(tan(pi/3) * d/2))+1
+# for x in range(-300,301,x_step):
 #    offset = (x//x_step) % 2 * d//2
 #    for y in range(-300+offset, 301+offset,d+1):
 #        goto(x, y)
@@ -202,9 +234,9 @@ def show_cam16ucs_hues():
 #    update()
 
 # NCS
-#ncs = eval(open('/home/user/edu/colour/ncs-final-int').read())
-#colormode(255)
-#for cc in [x for x in ncs if x[0].split('-')[0] == '2050']:
+# ncs = eval(open('/home/user/edu/colour/ncs-final-int').read())
+# colormode(255)
+# for cc in [x for x in ncs if x[0].split('-')[0] == '2050']:
 #    c = lab_to_cam16ucs(*cc[1][-1])
 #    goto(c[1] * 10, c[2] * 10)
 #    dot(20, 'black')
@@ -222,8 +254,8 @@ def show_cam16ucs_hues():
 #         dot(6, [c/255 for c in cc[1][0]])
 
 
-#colormode(255)
-#for h in hues[::2]:
+# colormode(255)
+# for h in hues[::2]:
 #    for cc in ncs[::]:
 #        if cc[0].split('-')[1] == h:
 #            c = lab_to_cam16ucs(*cc[1][-1])
@@ -234,22 +266,23 @@ def show_cam16ucs_hues():
 
 # hues='B,B10G,B20G,B30G,B40G,B50G,B60G,B70G,B80G,B90G,G,G10Y,G20Y,G30Y,G40Y,G50Y,G60Y,G70Y,G80Y,G90Y,N,R,R10B,R20B,R30B,R40B,R50B,R60B,R70B,R80B,R90B,Y,Y10R,Y20R,Y30R,Y40R,Y50R,Y60R,Y70R,Y80R,Y90R'.split(',')
 
+
 def show_kluwer_themes(themes, rows=7, r=50):
     row = 1
     for t in themes:
-        for s in t['swatches']:
-            color = '#' + s['hex']
+        for s in t["swatches"]:
+            color = "#" + s["hex"]
             dot(r, color)
-            write(color, align='center')
+            write(color, align="center")
             forward(r)
-        backward(r*len(t['swatches']))
+        backward(r * len(t["swatches"]))
         if row < rows:
             right(90)
             forward(r)
             left(90)
             row = row + 1
         else:
-            forward(r*6)
+            forward(r * 6)
             left(90)
             forward((rows - 1) * r)
             right(90)

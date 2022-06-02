@@ -9,12 +9,25 @@ import pymunk
 
 from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.image import Image
-from kivy.graphics import Color, Line, Triangle, \
-        PushMatrix, PopMatrix, Mesh, BindTexture
+from kivy.graphics import (
+    Color,
+    Line,
+    Triangle,
+    PushMatrix,
+    PopMatrix,
+    Mesh,
+    BindTexture,
+)
 from kivy.graphics.transformation import Matrix
+
 # from kivy.graphics.context_instructions import Rotate, Translate, Scale, Transform as KvTransform
-from kivy.properties import StringProperty, NumericProperty, \
-        ObjectProperty, BooleanProperty, DictProperty
+from kivy.properties import (
+    StringProperty,
+    NumericProperty,
+    ObjectProperty,
+    BooleanProperty,
+    DictProperty,
+)
 from kivy.clock import Clock
 from kivy.utils import escape_markup
 from kivy.animation import Animation
@@ -24,7 +37,16 @@ from ourturtle import Turtle
 from codean import CodeRunner, Break, COMMON_CODE
 from uix.var_slider import VarSlider
 from playground.color import _global_update_colors, Color as OurColor
-from playground.shapes import Stroke, Physics, Shape, Circle, Rectangle, KeepRefs, Image as OurImage, Line as OurLine
+from playground.shapes import (
+    Stroke,
+    Physics,
+    Shape,
+    Circle,
+    Rectangle,
+    KeepRefs,
+    Image as OurImage,
+    Line as OurLine,
+)
 from playground.geometry import Vector, VectorRef, Transform
 
 try:
@@ -33,29 +55,41 @@ except:
     pass
 
 
-F_UPDATE = 'update'
-F_ON_KEY_PRESS = 'on_key_press'
-F_ON_KEY_RELEASE = 'on_key_release'
+F_UPDATE = "update"
+F_ON_KEY_PRESS = "on_key_press"
+F_ON_KEY_RELEASE = "on_key_release"
 
 FPS = 60
 
 TRANSITION_TIME = 0.4  # * 2 # FIXME: Import from common config
-TRANSITION_IN = 'in_back'
-TRANSITION_OUT = 'out_back'
+TRANSITION_IN = "in_back"
+TRANSITION_OUT = "out_back"
 
 
 def whos(vars, max_repr=40):
     w_types = (int, float, str, list, dict, tuple)
-    w_types += (OurColor, Stroke, Physics, Shape, Circle, Rectangle, KeepRefs, OurImage, Vector, VectorRef, Transform)
+    w_types += (
+        OurColor,
+        Stroke,
+        Physics,
+        Shape,
+        Circle,
+        Rectangle,
+        KeepRefs,
+        OurImage,
+        Vector,
+        VectorRef,
+        Transform,
+    )
+
     def w_repr(v):
         r = repr(v)
-        return r if len(r) < max_repr else r[:max_repr-3] + '...'
-    return [(k, type(v).__qualname__, w_repr(v))
-            for k, v in vars.items()
-            if isinstance(v, w_types) and k[0] != '_']
+        return r if len(r) < max_repr else r[: max_repr - 3] + "..."
+
+    return [(k, type(v).__qualname__, w_repr(v)) for k, v in vars.items() if isinstance(v, w_types) and k[0] != "_"]
 
 
-class Key(namedtuple('Key', ['keycode', 'key', 'text'])):
+class Key(namedtuple("Key", ["keycode", "key", "text"])):
     def __eq__(self, b):
         if b is not None and b in (self.keycode, self.key, self.text):
             return True
@@ -67,8 +101,7 @@ class Key(namedtuple('Key', ['keycode', 'key', 'text'])):
 
 class Playground(FloatLayout):
 
-
-    code = StringProperty() # '''ball = add_sprite('circle', x=0, y=-120, body_type=0, color='green')
+    code = StringProperty()  # '''ball = add_sprite('circle', x=0, y=-120, body_type=0, color='green')
     # ball.apply_impulse((50000, 0))
 
     # platform = add_sprite('platform', x=250, y=-120, body_type=1, color='red')
@@ -87,11 +120,11 @@ class Playground(FloatLayout):
 
     vars = DictProperty({})
 
-    status = ObjectProperty((None, ))
+    status = ObjectProperty((None,))
 
-    status_text = StringProperty('')
-    console = StringProperty('')
-    watches = StringProperty('')
+    status_text = StringProperty("")
+    console = StringProperty("")
+    watches = StringProperty("")
     replay_step = NumericProperty(0)
     replay_steps = NumericProperty(0)
 
@@ -118,26 +151,25 @@ class Playground(FloatLayout):
         self._last_update_time = None
 
         globs = dict()
-        for v in 'random randint uniform choice seed sin cos atan2 \
-                sqrt ceil floor degrees radians log exp'.split():
+        for (
+            v
+        ) in "random randint uniform choice seed sin cos atan2 \
+                sqrt ceil floor degrees radians log exp".split():
             globs[v] = eval(v)
 
         def _dump_vars(v, lineno):
             global _vars
             for k, v in v.copy().items():
-                if any(
-                    [isinstance(v, t)
-                     for t in [int, float, str, dict, tuple]]) and k[0] != '_':
-                    self._run_vars[lineno][k].append(
-                        v if getsizeof(v) <= _MAX_VAR_SIZE else '<LARGE>')
+                if any([isinstance(v, t) for t in [int, float, str, dict, tuple]]) and k[0] != "_":
+                    self._run_vars[lineno][k].append(v if getsizeof(v) <= _MAX_VAR_SIZE else "<LARGE>")
 
-        globs['Turtle'] = Turtle
+        globs["Turtle"] = Turtle
         try:
-            globs['cam16_to_srgb'] = mycolors.cam16_to_srgb
-            globs['cam16ucs_to_srgb'] = mycolors.cam16ucs_to_srgb
-            globs['jzazbz_to_srgb'] = mycolors.jzazbz_to_srgb
-            globs['srgb_to_cam16ucs'] = mycolors.srgb_to_cam16ucs
-            globs['lab_to_cam16ucs'] = mycolors.lab_to_cam16ucs
+            globs["cam16_to_srgb"] = mycolors.cam16_to_srgb
+            globs["cam16ucs_to_srgb"] = mycolors.cam16ucs_to_srgb
+            globs["jzazbz_to_srgb"] = mycolors.jzazbz_to_srgb
+            globs["srgb_to_cam16ucs"] = mycolors.srgb_to_cam16ucs
+            globs["lab_to_cam16ucs"] = mycolors.lab_to_cam16ucs
             # for v in dir(mycolors):
             #     if v[0] != '_':
             #         self._globals[v] = getattr(mycolors, v)
@@ -149,14 +181,16 @@ class Playground(FloatLayout):
             self.sandbox.add_widget(sp)
             # self.sandbox.add_widget(Button(text='Abc'))
             return sp
-        globs['add_sprite'] = _add_sprite
+
+        globs["add_sprite"] = _add_sprite
 
         def _add_line(*largs, **kvargs):
             # self.sandbox.add_widget(line)
             with self.sandbox.canvas:
                 line = Line(*largs, **kvargs)
             return line
-        globs['Line'] = _add_line
+
+        globs["Line"] = _add_line
 
         # self.sokoban = Sokoban()
         # def sokoban_go(dx, dy):
@@ -173,16 +207,20 @@ class Playground(FloatLayout):
         #     self._segments.append((point_a, point_b, radius, color))
         # globs['Segment'] = _add_segment
         self._gravity = Vector(0, 0)
+
         def _set_gravity(g=(0, -900)):
             if isinstance(g, (int, float)):
                 g = (0, g)
             self._gravity = Vector(g)
-        globs['set_gravity'] = _set_gravity
+
+        globs["set_gravity"] = _set_gravity
 
         self._show_clipped = True
+
         def _show_clipped_colors(show=True):
             self._show_clipped = show
-        globs['show_clipped_colors'] = _show_clipped_colors
+
+        globs["show_clipped_colors"] = _show_clipped_colors
 
         self.trigger_exec_update = Clock.create_trigger(self.execute_update, -1)
         self.update_schedule = None
@@ -192,7 +230,7 @@ class Playground(FloatLayout):
         self.code_editor.namespace = self.runner.globals  # FIXME?
 
         # FIXME
-        vs1 = VarSlider(var_name='a', min=0, max=360, type='float')
+        vs1 = VarSlider(var_name="a", min=0, max=360, type="float")
         # vs2 = VarSlider(var_name='b', type='float')
         # vs3 = VarSlider(var_name='c', type='float')
         # vs4 = VarSlider(var_name='l', min=0, max=50)
@@ -218,24 +256,26 @@ class Playground(FloatLayout):
         self.code_editor.focus_next = self.sandbox
         self.sandbox.focus_next = self.code_editor
 
-        #@debounce(0.2)
+        # @debounce(0.2)
         def _set_var(wid, value):
-            self.sandbox.transition_time = TRANSITION_TIME / 2 #0.2
-            self.sandbox.transition_in = 'in_cubic'
-            self.sandbox.transition_out = 'out_cubic'
+            self.sandbox.transition_time = TRANSITION_TIME / 2  # 0.2
+            self.sandbox.transition_in = "in_cubic"
+            self.sandbox.transition_out = "out_cubic"
             self.vars[wid.var_name] = value
             if wid.var_name in self.runner.common_vars:
                 self.trigger_exec()
 
-        if exists('source.py'):
-            with open('source.py') as f:
+        if exists("source.py"):
+            with open("source.py") as f:
                 self.code = f.read()
+
             def _reset_cursor(*t):
                 self.code_editor.cursor = 0, 0
+
             Clock.schedule_once(_reset_cursor, 0)
-                # self.code_editor.scroll_x = 0
-                # self.code_editor.scroll_y = 0
-                # self.code_editor.cursor = 0, 0
+            # self.code_editor.scroll_x = 0
+            # self.code_editor.scroll_y = 0
+            # self.code_editor.cursor = 0, 0
 
         # FIXME
         vs1.bind(value=_set_var)
@@ -244,7 +284,7 @@ class Playground(FloatLayout):
         # vs4.bind(value=_set_var)
         # vs5.bind(value=_set_var)
         # vs6.bind(value=_set_var)
-        vs1.value = 36.
+        vs1.value = 36.0
         # vs2.value = 3.4
         # vs3.value = 4.2
         # vs4.value = 15
@@ -261,7 +301,7 @@ class Playground(FloatLayout):
         ti = self.code_editor
         scrlv = self.code_editor_scrlv
         y_cursor = ti.cursor_pos[1]
-        y_bar = scrlv.scroll_y * (ti.height-scrlv.height)
+        y_bar = scrlv.scroll_y * (ti.height - scrlv.height)
         if ti.height > scrlv.height:
             if y_cursor >= y_bar + scrlv.height:
                 dy = y_cursor - (y_bar + scrlv.height)
@@ -272,7 +312,7 @@ class Playground(FloatLayout):
 
     def code_editor_on_key_down(self, widget, window, keycode, text, modifiers):
         # print('code_editor_on_key_down', keycode, text, modifiers)
-        if keycode[1] == 'f5':
+        if keycode[1] == "f5":
             self.step = 0
             self.prev_step = 0
             self.runner.reset()
@@ -280,20 +320,23 @@ class Playground(FloatLayout):
             return True
 
     def sandbox_on_key_down(self, widget, window, keycode, text, modifiers):
-        if keycode[1] == 'f5':
+        if keycode[1] == "f5":
             self.step = 0
             self.prev_step = 0
             self.runner.reset()
             self.trigger_exec()
             return True
-        self._kb_events.append((
-            'down', time(),
-            Key(keycode=keycode[0], key=keycode[1], text=text), modifiers))
+        self._kb_events.append(
+            (
+                "down",
+                time(),
+                Key(keycode=keycode[0], key=keycode[1], text=text),
+                modifiers,
+            )
+        )
 
     def sandbox_on_key_up(self, widget, window, keycode):
-        self._kb_events.append((
-            'up', time(),
-            Key(keycode=keycode[0], key=keycode[1], text=None), None))
+        self._kb_events.append(("up", time(), Key(keycode=keycode[0], key=keycode[1], text=None), None))
 
     def on_replay_step(self, *largs):
         pass
@@ -309,36 +352,40 @@ class Playground(FloatLayout):
 
     def on_status(self, *largs):
         status = self.status[0]
-        if status == 'ERROR':
+        if status == "ERROR":
             exc = self.status[1]
             exc_name = exc.__class__.__name__ if exc else "Unknown Error"
-            self.status_text = f'[b][color=f92672]{exc_name}[/color]: [/b]'
+            self.status_text = f"[b][color=f92672]{exc_name}[/color]: [/b]"
             if isinstance(exc, SyntaxError):
-                code = (exc.text or self.code.splitlines()[exc.lineno - 1]).replace('\n', '⏎')  #.replace('\t', ' ' * 4).replace(' ', '˽')
+                code = (exc.text or self.code.splitlines()[exc.lineno - 1]).replace(
+                    "\n", "⏎"
+                )  # .replace('\t', ' ' * 4).replace(' ', '˽')
                 pos = exc.offset - 1
                 code_before = escape_markup(code[:pos].lstrip())
-                code_hl  = escape_markup(code[pos].replace(' ', '_'))
-                code_after = escape_markup(code[pos+1:].rstrip()) if len(code) > pos else ""
-                code = f'[color=e6db74]{code_before}[/color][b][color=f92672]{code_hl}[/color][/b][color=e6db74]{code_after}[/color]'
-                self.status_text += f'{escape_markup(exc.msg)}: {code}'
+                code_hl = escape_markup(code[pos].replace(" ", "_"))
+                code_after = escape_markup(code[pos + 1 :].rstrip()) if len(code) > pos else ""
+                code = f"[color=e6db74]{code_before}[/color][b][color=f92672]{code_hl}[/color][/b][color=e6db74]{code_after}[/color]"
+                self.status_text += f"{escape_markup(exc.msg)}: {code}"
             else:
-                msg = str(exc) or '???'
+                msg = str(exc) or "???"
                 self.status_text += escape_markup(msg)
-        elif status == 'BREAK':
-            self.status_text = '[color=e6db74][b]Break[/b][/color]'
-        elif status == 'EXEC':
+        elif status == "BREAK":
+            self.status_text = "[color=e6db74][b]Break[/b][/color]"
+        elif status == "EXEC":
             pass
-        elif status == 'COMPLETE':
-            self.status_text = '[color=a6e22e][b]Completed[/b][/color]'
-        elif status == 'RUN':
-            self.status_text = '[color=a6e22e][b]Run[/b][/color]'
+        elif status == "COMPLETE":
+            self.status_text = "[color=a6e22e][b]Completed[/b][/color]"
+        elif status == "RUN":
+            self.status_text = "[color=a6e22e][b]Run[/b][/color]"
         else:
             pass
 
     def update_sandbox(self, redraw=True):
         from difflib import SequenceMatcher
+
         matcher_opcodes = None
         tex_coords_fill = tex_coords_stroke = 0.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0
+
         def update_texture(image, texture):
             if image.source in self.sandbox.image_meshes:
                 for mesh in self.sandbox.image_meshes[image.source]:
@@ -346,13 +393,14 @@ class Playground(FloatLayout):
             # else:
             #     print('DEL', image, image.source)
             #     del image
+
         def match_lines(lines):
             match = []
             for lineno in lines:
                 lineno -= 1
                 for tag, i1, i2, j1, j2 in matcher_opcodes:
                     if i1 <= lineno < i2:
-                        if tag in ('equal', 'replace'):
+                        if tag in ("equal", "replace"):
                             match.append(1 + lineno + j1 - i1)
                         else:
                             match.append(-1)
@@ -380,13 +428,13 @@ class Playground(FloatLayout):
 
                 old_code = self.sandbox.code
                 new_code = self.code.splitlines()
-                matcher = SequenceMatcher(lambda x: x in ' \t', new_code, old_code)
+                matcher = SequenceMatcher(lambda x: x in " \t", new_code, old_code)
                 matcher_opcodes = matcher.get_opcodes()
                 self.sandbox.code = new_code
 
             for shape in Shape.get_instances(True):
                 shape_ids.append(id(shape))
-                render_shape = None #if redraw else self.sandbox.shapes_by_id.get(id(shape))
+                render_shape = None  # if redraw else self.sandbox.shapes_by_id.get(id(shape))
                 shape_trace = (shape._trace, shape._trace_iter) if shape._trace else None
                 if shape_trace is not None:
                     shape_traces.append(shape_trace)
@@ -423,11 +471,13 @@ class Playground(FloatLayout):
                         image_stroke = self.sandbox.images.get(source)
                         if not image_stroke:
                             image_stroke = Image(
-                                source=source, mipmap=True,
-                                anim_delay=shape.stroke.fill.anim_delay)
+                                source=source,
+                                mipmap=True,
+                                anim_delay=shape.stroke.fill.anim_delay,
+                            )
                             self.sandbox.images[source] = image_stroke
                             # self.sandbox.images[shape.fill.source] = image
-                            image.bind(texture=update_texture) # TODO: Animation
+                            image.bind(texture=update_texture)  # TODO: Animation
                             # TODO: If not exists (image_stroke.texture is None)...
                         texture_stroke = image_stroke.texture
                         tex_coords_stroke = texture_stroke.tex_coords
@@ -441,10 +491,12 @@ class Playground(FloatLayout):
                         fill = 1, 1, 1, 1
                         source = shape.fill.source
                         image_fill = self.sandbox.images.get(source)
-                        if not image_fill: #shape.fill.source not in self.sandbox.images:
+                        if not image_fill:  # shape.fill.source not in self.sandbox.images:
                             image_fill = Image(
-                                source=source, mipmap=True,
-                                anim_delay=shape.fill.anim_delay)
+                                source=source,
+                                mipmap=True,
+                                anim_delay=shape.fill.anim_delay,
+                            )
                             self.sandbox.images[source] = image_fill
                             # self.sandbox.images[shape.fill.source] = image
                             # image_fill.bind(texture=update_texture)
@@ -464,7 +516,9 @@ class Playground(FloatLayout):
                                 texture_x = (texture_fill.width - texture_width) / 2
                                 texture_y = (texture_fill.height - texture_height) / 2
                                 # print('TEX', texture_x, texture_y, texture_width, texture_height)
-                                texture_fill = texture_fill.get_region(texture_x, texture_y, texture_width, texture_height)
+                                texture_fill = texture_fill.get_region(
+                                    texture_x, texture_y, texture_width, texture_height
+                                )
                             tex_coords_fill = texture_fill.tex_coords
                             # TODO: Mark figure.
                     else:
@@ -491,11 +545,35 @@ class Playground(FloatLayout):
                     a = b = shape.radius * 2
                     a1 = radians(shape.angle_start)
                     a2 = radians(shape.angle_end)
-                    v_attrs = x+tr[4], y+tr[5], w, *stroke, *fill, a1, a2, *tr[:4]
-                    v0 = -a, -b, *v_attrs, *tex_coords_fill[0:2], *tex_coords_stroke[0:2]
-                    v1 = -a, +b, *v_attrs, *tex_coords_fill[6:8], *tex_coords_stroke[6:8]
-                    v2 = +a, -b, *v_attrs, *tex_coords_fill[2:4], *tex_coords_stroke[2:4]
-                    v3 = +a, +b, *v_attrs, *tex_coords_fill[4:6], *tex_coords_stroke[4:6]
+                    v_attrs = x + tr[4], y + tr[5], w, *stroke, *fill, a1, a2, *tr[:4]
+                    v0 = (
+                        -a,
+                        -b,
+                        *v_attrs,
+                        *tex_coords_fill[0:2],
+                        *tex_coords_stroke[0:2],
+                    )
+                    v1 = (
+                        -a,
+                        +b,
+                        *v_attrs,
+                        *tex_coords_fill[6:8],
+                        *tex_coords_stroke[6:8],
+                    )
+                    v2 = (
+                        +a,
+                        -b,
+                        *v_attrs,
+                        *tex_coords_fill[2:4],
+                        *tex_coords_stroke[2:4],
+                    )
+                    v3 = (
+                        +a,
+                        +b,
+                        *v_attrs,
+                        *tex_coords_fill[4:6],
+                        *tex_coords_stroke[4:6],
+                    )
                     vertices = v0 + v1 + v2 + v3
                     indices = [0, 1, 2, 3]
 
@@ -506,11 +584,35 @@ class Playground(FloatLayout):
                     x, y = shape.corner
                     a, b = shape.size
                     r = shape.radius
-                    v_attrs = x+tr[4], y+tr[5], r, w, *stroke, *fill, *tr[:4]
-                    v0 = -a, -b, *v_attrs, *tex_coords_fill[0:2], *tex_coords_stroke[0:2]
-                    v1 = -a, +b, *v_attrs, *tex_coords_fill[6:8], *tex_coords_stroke[6:8]
-                    v2 = +a, -b, *v_attrs, *tex_coords_fill[2:4], *tex_coords_stroke[2:4]
-                    v3 = +a, +b, *v_attrs, *tex_coords_fill[4:6], *tex_coords_stroke[4:6]
+                    v_attrs = x + tr[4], y + tr[5], r, w, *stroke, *fill, *tr[:4]
+                    v0 = (
+                        -a,
+                        -b,
+                        *v_attrs,
+                        *tex_coords_fill[0:2],
+                        *tex_coords_stroke[0:2],
+                    )
+                    v1 = (
+                        -a,
+                        +b,
+                        *v_attrs,
+                        *tex_coords_fill[6:8],
+                        *tex_coords_stroke[6:8],
+                    )
+                    v2 = (
+                        +a,
+                        -b,
+                        *v_attrs,
+                        *tex_coords_fill[2:4],
+                        *tex_coords_stroke[2:4],
+                    )
+                    v3 = (
+                        +a,
+                        +b,
+                        *v_attrs,
+                        *tex_coords_fill[4:6],
+                        *tex_coords_stroke[4:6],
+                    )
                     vertices = v0 + v1 + v2 + v3
                     indices = [0, 1, 2, 3]
 
@@ -519,8 +621,13 @@ class Playground(FloatLayout):
                     vfmt = self.sandbox.dls._vbuffer.vfmt
 
                     self.sandbox.dls.clear()
-                    self.sandbox.dls.append(shape.points, translate=(tr[4], tr[5]),
-                          color=(1,0,0,1), linewidth=w+2, dash_pattern = 'solid')
+                    self.sandbox.dls.append(
+                        shape.points,
+                        translate=(tr[4], tr[5]),
+                        color=(1, 0, 0, 1),
+                        linewidth=w + 2,
+                        dash_pattern="solid",
+                    )
                     vertices = self.sandbox.dls.vertices.tolist()
                     indices = self.sandbox.dls.indices.tolist()
                     self.sandbox.dls.bind_textures()
@@ -528,10 +635,19 @@ class Playground(FloatLayout):
                 else:
                     raise NotImplementedError
 
-                new_shapes.append((
-                    id(shape), render_context, vfmt, texture_stroke, texture_fill, vertices,
-                    indices, 'triangle_strip', (image_fill,)
-                ))
+                new_shapes.append(
+                    (
+                        id(shape),
+                        render_context,
+                        vfmt,
+                        texture_stroke,
+                        texture_fill,
+                        vertices,
+                        indices,
+                        "triangle_strip",
+                        (image_fill,),
+                    )
+                )
 
                 with render_context:
                     BindTexture(texture=texture_stroke, index=1)
@@ -545,9 +661,13 @@ class Playground(FloatLayout):
                         else:
                             initial_vs = vertices
                         mesh = Mesh(
-                            fmt=vfmt, mode='triangle_strip', vertices=initial_vs,
-                            indices=indices, texture=texture_fill)
-                    self.sandbox.shapes_by_id[id(shape)] = ((render_context, (mesh, )), )
+                            fmt=vfmt,
+                            mode="triangle_strip",
+                            vertices=initial_vs,
+                            indices=indices,
+                            texture=texture_fill,
+                        )
+                    self.sandbox.shapes_by_id[id(shape)] = ((render_context, (mesh,)),)
                     if image_fill is not None:
                         self.sandbox.image_meshes[image_fill.source].append(mesh)
                 else:
@@ -555,40 +675,47 @@ class Playground(FloatLayout):
                     mesh.texture = texture_fill
 
                 if shape_trace:
-                    self.sandbox.shapes_by_trace[shape_trace] = ((render_context, (mesh, )), )
+                    self.sandbox.shapes_by_trace[shape_trace] = ((render_context, (mesh,)),)
 
                 # else:
-                    # self.sandbox.shapes[id(shape)][0].vertices = vertices
+                # self.sandbox.shapes[id(shape)][0].vertices = vertices
 
-                    # SO [1]: If an animation is repeated for many interactions (like a contextual
-                    # menu), a slower, more-perceivable animation (600ms) is going to feel quite
-                    # tedious to most of your users. Micro-animations (like a nav bar or a context
-                    # menu) of ~250ms will be noticeable by most people, but just noticeable enough
-                    # that they won't feel like they're waiting for it.
-                    #
-                    # SO [2]: The sweet spot that shows up time after time in game and UI design is
-                    # 250-300ms. For transitions that bounce or are elastic, 400-500ms lets the
-                    # motion read better.
+                # SO [1]: If an animation is repeated for many interactions (like a contextual
+                # menu), a slower, more-perceivable animation (600ms) is going to feel quite
+                # tedious to most of your users. Micro-animations (like a nav bar or a context
+                # menu) of ~250ms will be noticeable by most people, but just noticeable enough
+                # that they won't feel like they're waiting for it.
+                #
+                # SO [2]: The sweet spot that shows up time after time in game and UI design is
+                # 250-300ms. For transitions that bounce or are elastic, 400-500ms lets the
+                # motion read better.
                 # mesh.vertices = vertices
 
                 if redraw and self.sandbox.transition_time > 0:
+
                     def _on_complete(*lt):
                         if mesh is not None:
                             mesh.vertices = vertices
+
                     Animation.stop_all(mesh)
-                    # FIXME: Fails when line becomes shorter on animation.py:361: return tp([_calculate(a[x], b[x], t) for x in range(len(a))])
-                    anim = Animation(vertices=vertices, t=self.sandbox.transition_out,
-                        duration=self.sandbox.transition_time)
+                    # FIXME: Fails when line becomes shorter on animation.py:
+                    #        361: return tp([_calculate(a[x], b[x], t) for x in range(len(a))])
+                    anim = Animation(
+                        vertices=vertices,
+                        t=self.sandbox.transition_out,
+                        duration=self.sandbox.transition_time,
+                    )
                     anim.bind(on_complete=_on_complete)
                     anim.start(mesh)
                 else:
                     mesh.vertices = vertices
 
             def remove_garbage(shapes):
-                for shape in shapes: #chain(shapes.get(oid, ()) for oid in oids):
+                for shape in shapes:  # chain(shapes.get(oid, ()) for oid in oids):
                     for context, instructions in shape:
                         for inst in instructions:
                             context.remove(inst)
+
             to_remove = old_shapes - set([shape for shape in self.sandbox.shapes_by_id.values()])
 
             for shape_trace in set(self.sandbox.shapes_by_trace) - set(shape_traces):
@@ -603,9 +730,15 @@ class Playground(FloatLayout):
                             v_len = len(vertices) // 4
                             # Set initial size to 0, 0
                             initial_vs = tuple(0 if i % v_len in (0, 1) else v for i, v in enumerate(vertices))
-                            Animation(vertices=initial_vs, t=self.sandbox.transition_in,
-                                duration=self.sandbox.transition_time).start(mesh)
-                Clock.schedule_once(lambda _:  remove_garbage(to_remove), self.sandbox.transition_time + 1 / FPS)
+                            Animation(
+                                vertices=initial_vs,
+                                t=self.sandbox.transition_in,
+                                duration=self.sandbox.transition_time,
+                            ).start(mesh)
+                Clock.schedule_once(
+                    lambda _: remove_garbage(to_remove),
+                    self.sandbox.transition_time + 1 / FPS,
+                )
             else:
                 remove_garbage(to_remove)
 
@@ -615,7 +748,7 @@ class Playground(FloatLayout):
             # print('self.sandbox.shapes_by_trace AFTER', len(self.sandbox.shapes_by_trace))
 
             # for oid in to_remove:
-                # self.sandbox.shapes_by_id.pop(oid, None)
+            # self.sandbox.shapes_by_id.pop(oid, None)
             # for oid, shape in self.sandbox.shapes_by_id.items():
             #     if shape in to_remove:
             #         # print('Removing', oid, shape)
@@ -629,7 +762,7 @@ class Playground(FloatLayout):
             # print('T2-3', t3-t2)
             # print('T', t3-t1)
         except Exception as e:
-            print('E at update_sandbox:')
+            print("E at update_sandbox:")
             print_exc()
 
         # try:
@@ -644,7 +777,6 @@ class Playground(FloatLayout):
         #             # Ellipse(pos=(300, 100), size=(200, 200))
 
         #             # self.mesh = self.sandbox.build_mesh()
-
 
         #             for shape in Circle.get_instances():
         #                 stroke = shape.stroke
@@ -776,7 +908,7 @@ class Playground(FloatLayout):
             changed = self.runner.parse(self.code, breakpoint)
             if changed:
                 try:
-                    with open('source.py', 'w') as f:
+                    with open("source.py", "w") as f:
                         f.write(self.code)
                 except Exception as e:
                     print("Cannot save file:", e)
@@ -785,13 +917,13 @@ class Playground(FloatLayout):
 
             # self.runner.compile() # changed) FIXME
         except Exception as e:
-            print('E:', e)
+            print("E:", e)
             print_exc()
-            print('* ' * 40)
+            print("* " * 40)
             line_num = self.runner.exception_lineno(e)
-            self.code_editor.highlight_line(None, 'run')
+            self.code_editor.highlight_line(None, "run")
             self.code_editor.highlight_line(line_num)
-            self.status = ('ERROR', e)
+            self.status = ("ERROR", e)
         else:
             self.code_editor.highlight_line(None)
             if COMMON_CODE in changed:
@@ -802,21 +934,24 @@ class Playground(FloatLayout):
                 changed.remove(COMMON_CODE)
             # print('EXEC Changed:', changed)
             try:
-                if self.runner.execute(changed) and F_UPDATE in self.runner.globals \
-                        and not (self.update_schedule and self.update_schedule.is_triggered):
+                if (
+                    self.runner.execute(changed)
+                    and F_UPDATE in self.runner.globals
+                    and not (self.update_schedule and self.update_schedule.is_triggered)
+                ):
                     if self.trigger_exec_update:
                         self.trigger_exec_update.cancel()
                     if self.update_schedule is not None:
                         self.update_schedule.cancel()
                         self.update_schedule()
             except Exception as e:
-                print('E3:', e)
+                print("E3:", e)
                 print_exc()
-                self.status = ('ERROR', None)
+                self.status = ("ERROR", None)
 
     def execute_code(self, *largs):
-        print('execute_code')
-        self.status = ('EXEC',)
+        print("execute_code")
+        self.status = ("EXEC",)
         if self.update_schedule:
             self.update_schedule.cancel()
         if self.trigger_exec_update:
@@ -854,7 +989,7 @@ class Playground(FloatLayout):
         self.sandbox.space.sleep_time_threshold = 3.0
         self.sandbox.space.replay_mode = False
         for widget in saved:
-            print('SAVED:', widget)
+            print("SAVED:", widget)
             self.sandbox.add_widget(widget)
         self.sandbox.canvas.add(self.sandbox.rc1)
         self.sandbox.canvas.add(self.sandbox.rc2)
@@ -875,8 +1010,8 @@ class Playground(FloatLayout):
         static_body = self.sandbox.space.static_body
         # for a, b, radius, color in self._segments:
         # static_lines = [pymunk.Segment(static_body, (-311.0, 280.0-400), (0.0, 246.0-400), 0.0),
-                        # pymunk.Segment(static_body, (0.0, 246.0-400), (607.0, 343.0-400), 0.0)
-                        # ]
+        # pymunk.Segment(static_body, (0.0, 246.0-400), (607.0, 343.0-400), 0.0)
+        # ]
         # for line in static_lines:
         #     line.elasticity = 0.95
         #     line.friction = 0.9
@@ -888,29 +1023,28 @@ class Playground(FloatLayout):
         try:
             ok = self.runner.execute()
         except Exception as e:
-            print('E2:')
+            print("E2:")
             print_exc()
-        print('Exec Time:', process_time() - start)
+        print("Exec Time:", process_time() - start)
 
-        watches = ''
+        watches = ""
         for v, t, r in whos(self.runner.globals):
             watches += f'{v + " " * (8 - len(v))}  {r}\n'
             # watches += f'{v + " " * (8 - len(v))} {t + " " * (5 - len(t))}  {r}\n'
 
-        if False: # ok and F_UPDATE in self.runner.globals and self.prev_step > 0:
+        if False:  # ok and F_UPDATE in self.runner.globals and self.prev_step > 0:
             # print('Replay:', prev_step)
             t_start = time()
-            self._last_update_time = time() - self.prev_step * 1/30
+            self._last_update_time = time() - self.prev_step * 1 / 30
             for i in range(self.prev_step):
                 self.execute_update(0.0, True)
             Sprite.update_from_pymunk(False)
-            print('Replay time:', (time() - t_start) * 1000, 'ms')
-
+            print("Replay time:", (time() - t_start) * 1000, "ms")
 
         out = self.runner.text_stream.getvalue()
         self.console = out
-        print('out:', out)
-        print('- ' * 40)
+        print("out:", out)
+        print("- " * 40)
 
         # FIXME: add scene spdiff
         # self.update_sandbox()
@@ -928,26 +1062,28 @@ class Playground(FloatLayout):
                 # print('STACK', self.runner.traceback.stack)
                 # stack = None
                 exc, exc_str, traceback = self.runner.exception
-                print('EXC:', exc_str)
+                print("EXC:", exc_str)
                 is_break = isinstance(exc, Break)
                 if is_break:
-                    self.status = ('BREAK', exc)
-                    hl_style = 'run'
+                    self.status = ("BREAK", exc)
+                    hl_style = "run"
                     # self.code_editor.highlight_line(None, 'run')
                 else:
-                    self.status = ('ERROR', exc)
-                    hl_style = 'error'
+                    self.status = ("ERROR", exc)
+                    hl_style = "error"
                 # print('Br Line:', self.runner.breakpoint)
                 self.code_editor.highlight_line(None)
-                self.code_editor.highlight_line(None, 'run')
+                self.code_editor.highlight_line(None, "run")
                 # self.code_editor.highlight_line(self.runner.breakpoint, 'run')
                 for filename, lineno, name, line, locals in traceback:
-                    print('TRACE:', filename, lineno, name, repr(line), repr(locals)[:800]) # filename, lineno, name, line, locals)
+                    print(
+                        "TRACE:", filename, lineno, name, repr(line), repr(locals)[:800]
+                    )  # filename, lineno, name, line, locals)
                     # if filename == '<code-input>':
                     #     if name != '<module>':
                     watched_locals = whos(locals)
                     if watched_locals:
-                        watches += f'== {name} ==\n'
+                        watches += f"== {name} ==\n"
                         for v, t, r in watched_locals:
                             watches += f'{v + " " * (8 - len(v))}  {r}\n'
                             # watches += f'{v}\t{t}\t{r}\n'
@@ -955,13 +1091,13 @@ class Playground(FloatLayout):
                         # print('LINES +', lineno, self.code_editor._highlight)
 
             else:
-                self.status = ('ERROR', None)
-                print('Unhandled exception')
-                self.code_editor.highlight_line(None) # FIXME
+                self.status = ("ERROR", None)
+                print("Unhandled exception")
+                self.code_editor.highlight_line(None)  # FIXME
         # else:
-            # self.code_editor.highlight_line(None)
+        # self.code_editor.highlight_line(None)
         else:
-            self.status = ('COMPLETE',)
+            self.status = ("COMPLETE",)
             self.code_editor.highlight_line(None)
             if F_UPDATE in self.runner.globals:
                 self._last_update_time = time()
@@ -971,14 +1107,17 @@ class Playground(FloatLayout):
             #     print('Level completed:', self.sokoban.level)
             #     self.sokoban.level += 1
             #     self.sandbox.clear_widgets()
-            if F_UPDATE in self.runner.globals:  # and (not self.update_schedule or not self.update_schedule.is_triggered):
+            if (
+                F_UPDATE in self.runner.globals
+            ):  # and (not self.update_schedule or not self.update_schedule.is_triggered):
                 # self.sandbox.transition_time = 0
                 def run_update(*t):
                     self.update_schedule = Clock.schedule_interval(self.trigger_exec_update, 1 / FPS)
+
                 self.update_schedule = Clock.schedule_once(run_update, self.sandbox.transition_time)
 
         self.watches = watches
-        print('= ' * 40)
+        print("= " * 40)
 
         # print("highlight", self.code_editor._highlight)
         # for k, v in self.runner.globals.items():
@@ -994,7 +1133,7 @@ class Playground(FloatLayout):
         self.sandbox.space.replay_mode = replay
         self.step += 1
         self.runner.globals.update(self.vars)
-        self.runner.globals['step'] = self.step
+        self.runner.globals["step"] = self.step
         if not replay:
             ts_pos = self.runner.text_stream.tell()
             now = time()
@@ -1005,9 +1144,9 @@ class Playground(FloatLayout):
         try:
             while self._kb_events:
                 ev, t, key, modifiers = self._kb_events[0]
-                if ev == 'down':
+                if ev == "down":
                     self.runner.call_if_exists(F_ON_KEY_PRESS, key, modifiers)
-                elif ev == 'up':
+                elif ev == "up":
                     self.runner.call_if_exists(F_ON_KEY_RELEASE, key)
                 self._kb_events.pop(0)
             self.runner.call(F_UPDATE, dt)
@@ -1018,7 +1157,7 @@ class Playground(FloatLayout):
                 self.update_schedule.cancel()
             if self.trigger_exec_update:
                 self.trigger_exec_update.cancel()
-            watches = ''
+            watches = ""
             for v, t, r in whos(self.runner.globals):
                 # watches += f'{v}\t{t}\t{r}\n'
                 watches += f'{v + " " * (8 - len(v))}  {r}\n'
@@ -1026,31 +1165,33 @@ class Playground(FloatLayout):
                 exc, exc_str, traceback = self.runner.exception
             else:
                 exc = e
-                if hasattr(e, 'message'):
+                if hasattr(e, "message"):
                     exc_str = e.message
                 else:
                     exc_str = str(e) or e.__class__.__name__
                 traceback = self.runner._trace(e.__traceback__)
-            print('EXC2:', exc_str)
+            print("EXC2:", exc_str)
             is_break = isinstance(exc, Break)
             if is_break:
-                self.status = ('BREAK', exc)
-                hl_style = 'run'
+                self.status = ("BREAK", exc)
+                hl_style = "run"
             else:
-                self.status = ('ERROR', exc)
-                hl_style = 'error'
+                self.status = ("ERROR", exc)
+                hl_style = "error"
             # print('E4', e)
             # lineno = self.runner.exception_lineno(e)
             self.code_editor.highlight_line(None)
-            self.code_editor.highlight_line(None, 'run')
+            self.code_editor.highlight_line(None, "run")
             # self.code_editor.highlight_line(self.runner.breakpoint, 'run')
             for filename, lineno, name, line, locals in traceback:
-                print('TRACE:', filename, lineno, name, repr(line), repr(locals)[:80]) # filename, lineno, name, line, locals)
-                if filename == '<code-input>':
-                    if name != '<module>':
+                print(
+                    "TRACE:", filename, lineno, name, repr(line), repr(locals)[:80]
+                )  # filename, lineno, name, line, locals)
+                if filename == "<code-input>":
+                    if name != "<module>":
                         watched_locals = whos(locals)
                         if watched_locals:
-                            watches += f'== {name} ==\n'
+                            watches += f"== {name} ==\n"
                             for v, t, r in watched_locals:
                                 # watches += f'{v}\t{t}\t{r}\n'
                                 watches += f'{v + " " * (8 - len(v))}  {r}\n'
@@ -1063,13 +1204,13 @@ class Playground(FloatLayout):
             if not replay:
                 Sprite.update_from_pymunk()
                 self.update_sandbox(False)
-                if self.status[0] != 'RUN':
-                    self.status = ('RUN',)
+                if self.status[0] != "RUN":
+                    self.status = ("RUN",)
 
         if not replay:
             self.runner.text_stream.seek(ts_pos)
             out = self.runner.text_stream.read()
             if out:
                 print(out)
-                print('* ' * 20)
+                print("* " * 20)
                 self.console = (self.console + out)[-3000:]

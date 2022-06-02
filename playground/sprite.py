@@ -9,9 +9,11 @@ from collections import OrderedDict
 from collections.abc import Iterable, Mapping
 from numbers import Number
 import pickle
+
 # import hashlib
 
 import kivy
+
 # kivy.require('1.9.1')
 
 from kivy.app import App
@@ -24,21 +26,21 @@ from kivy.uix.relativelayout import RelativeLayout
 from kivy.uix.anchorlayout import AnchorLayout
 from kivy.uix.image import Image  # as ImageWidget
 from kivy.clock import Clock
-from kivy.graphics import Ellipse, Line, Color, Triangle, Quad, Rectangle, \
-    Mesh, PushMatrix, PopMatrix
+from kivy.graphics import Ellipse, Line, Color, Triangle, Quad, Rectangle, Mesh, PushMatrix, PopMatrix
 from kivy.graphics.tesselator import Tesselator, WINDING_ODD, TYPE_POLYGONS
 from kivy.graphics.context_instructions import Rotate, Translate, Scale
 from kivy.graphics.transformation import Matrix
 from kivy.core.window import Window
+
 # from kivy.core.image import Image as CoreImage
-from kivy.properties import StringProperty, NumericProperty, \
-    ListProperty, ObjectProperty, AliasProperty
+from kivy.properties import StringProperty, NumericProperty, ListProperty, ObjectProperty, AliasProperty
 
 import numpy as np  # OurImage
 
 import pymunk
 import pymunk.autogeometry
 from pymunk import Body
+
 # from pymunk.vec2d import Vec2d
 from named_colors import COLORS
 
@@ -47,13 +49,12 @@ from playground.geometry import Vector, VectorRef, VectorRefProperty
 
 def trace_image(img, threshold=3, simplify_tolerance=0.7, cache=True):
     lines = None
-    trace_sig = file_sig(
-        stat(img.filename)), img.size, threshold, simplify_tolerance
+    trace_sig = file_sig(stat(img.filename)), img.size, threshold, simplify_tolerance
     # print('IMG', img.width, img.height)
     # print('SIG', trace_sig, img.filename)
     if cache:
         try:
-            with open(img.filename + '.contour', 'rb') as f:
+            with open(img.filename + ".contour", "rb") as f:
                 lines, fsig = pickle.load(f)
                 if fsig == trace_sig:
                     return lines
@@ -79,8 +80,7 @@ def trace_image(img, threshold=3, simplify_tolerance=0.7, cache=True):
         sample_func = sample_alpha
     else:
         sample_func = sample_black
-    pymunk.autogeometry.march_soft(bb, img.width, img.height, threshold,
-                                   segment_func, sample_func)
+    pymunk.autogeometry.march_soft(bb, img.width, img.height, threshold, segment_func, sample_func)
 
     lines = []
     for line in line_set:
@@ -97,7 +97,7 @@ def trace_image(img, threshold=3, simplify_tolerance=0.7, cache=True):
             min_y = min(min_y, l.y)
         w, h = max_x - min_x, max_y - min_y
 
-        center = (min_x + w / 2., min_y + h / 2.)
+        center = (min_x + w / 2.0, min_y + h / 2.0)
         # t = pymunk.Transform(a=1.0, d=1.0, tx=-center.x, ty=-center.y)
 
         line = [(l.x, img.height - l.y) for l in line]
@@ -106,7 +106,7 @@ def trace_image(img, threshold=3, simplify_tolerance=0.7, cache=True):
         # print('Lines:', len(lines))
     if cache and lines:
         try:
-            with open(img.filename + '.contour', 'wb') as f:
+            with open(img.filename + ".contour", "wb") as f:
                 pickle.dump((lines, trace_sig), f)
         except:
             pass
@@ -128,13 +128,16 @@ def trace_image(img, threshold=3, simplify_tolerance=0.7, cache=True):
 def ellipse_from_circle(shape):
     pos = shape.body.position - (shape.radius, shape.radius) + shape.offset
     e = Ellipse(pos=pos, size=[shape.radius * 2, shape.radius * 2])
-    circle_edge = shape.body.position + shape.offset + Vector(
-        shape.radius, 0).rotated(shape.body.angle)
-    Color(*COLORS['dark slate gray'])  # (.17,.24,.31)
-    line = Line(points=[
-        shape.body.position.x + shape.offset.x, shape.body.position.y +
-        shape.offset.y, circle_edge.x, circle_edge.y
-    ])
+    circle_edge = shape.body.position + shape.offset + Vector(shape.radius, 0).rotated(shape.body.angle)
+    Color(*COLORS["dark slate gray"])  # (.17,.24,.31)
+    line = Line(
+        points=[
+            shape.body.position.x + shape.offset.x,
+            shape.body.position.y + shape.offset.y,
+            circle_edge.x,
+            circle_edge.y,
+        ]
+    )
     return e, line
 
 
@@ -180,7 +183,7 @@ def draw_pymunk_shape(canvas, shape, color=None):
         if color:
             Color(*color)
         else:
-            Color(1., 1., 1.)
+            Color(1.0, 1.0, 1.0)
         if isinstance(shape, pymunk.Circle):
             return ellipse_from_circle(shape)
         if isinstance(shape, pymunk.Segment):
@@ -193,9 +196,7 @@ def draw_pymunk_shape(canvas, shape, color=None):
                 return Quad(points=points_from_poly(shape))
             else:
                 return Mesh(
-                    vertices=vertices_from_poly(shape),
-                    indices=range(len(vs)),
-                    mode="triangle_fan"
+                    vertices=vertices_from_poly(shape), indices=range(len(vs)), mode="triangle_fan"
                 )  # Line(points=self.points_from_poly(shape), width=3)
         elif isinstance(shape, pymunk.constraint.Constraint):
             points = points_from_constraint(shape)
@@ -204,8 +205,7 @@ def draw_pymunk_shape(canvas, shape, color=None):
 
 
 import numpy as np
-from numpy import sin, cos, arctan2 as atan2, \
-                  sqrt, ceil, floor, degrees, radians, log, pi, exp, transpose
+from numpy import sin, cos, arctan2 as atan2, sqrt, ceil, floor, degrees, radians, log, pi, exp, transpose
 from colorio import CIELAB, CAM16UCS, CAM16, JzAzBz, SrgbLinear
 from colorio.illuminants import whitepoints_cie1931
 
@@ -217,14 +217,13 @@ cam16ucs = CAM16UCS(0.69, 20, L_A)
 
 
 class Colors:
-
-    def __init__(self, colors=None, description='sRGB', **kwargs):
-        #self.cam16 = CAM16(0.69, 20, L_A)
-        c = kwargs.get('c', 0.69)
-        Y_b = kwargs.get('Y_b', 20)
-        L_A = kwargs.get('L_A', 64 / pi / 5)
-        exact_inversion = kwargs.get('exact_inversion', True)
-        whitepoint = kwargs.get('whitepoint', 'D65')
+    def __init__(self, colors=None, description="sRGB", **kwargs):
+        # self.cam16 = CAM16(0.69, 20, L_A)
+        c = kwargs.get("c", 0.69)
+        Y_b = kwargs.get("Y_b", 20)
+        L_A = kwargs.get("L_A", 64 / pi / 5)
+        exact_inversion = kwargs.get("exact_inversion", True)
+        whitepoint = kwargs.get("whitepoint", "D65")
         if isinstance(whitepoint, str):
             whitepoint = whitepoints_cie1931[whitepoint]
 
@@ -235,7 +234,7 @@ class Colors:
         self._srgb = SrgbLinear()
         self._srgb_colors = None
         self._original_colors = None
-        self._dimensions = 'Jsh'
+        self._dimensions = "Jsh"
 
         if colors:
             self.set(colors, description)
@@ -243,12 +242,12 @@ class Colors:
     def reset(self):
         self._colors = self._original_colors.copy()
 
-    def set(self, colors, description='sRGB'):
+    def set(self, colors, description="sRGB"):
         cam16ucs = self._cam16ucs
         cam16 = cam16ucs.cam16
         if isinstance(colors, str):
             colors = [colors]
-        if isinstance(colors, bytes): #'Image' in globals() and isinstance(colors, (Image, CoreImage, Texture)):
+        if isinstance(colors, bytes):  #'Image' in globals() and isinstance(colors, (Image, CoreImage, Texture)):
             # if isinstance(colors, CoreImage):
             #     texture = colors.texture
             # elif isinstance(colors, Image):
@@ -257,7 +256,7 @@ class Colors:
             #     texture = colors
             width, height = texture.size
             length = len(colors) // 4
-            image_srgb = np.fromstring(colors, dtype='ubyte').reshape(length, 4)[...,:3].astype('float') / 255
+            image_srgb = np.fromstring(colors, dtype="ubyte").reshape(length, 4)[..., :3].astype("float") / 255
             image_flat_srgb = image_srgb.reshape((length, 3)).T
 
             colors = image_flat_srgb
@@ -268,45 +267,45 @@ class Colors:
             self._srgb_colors = None
             if isinstance(colors[0], (tuple, list)):
                 if all([all([isinstance(c, int) for c in cc]) and len(cc) == 3 for cc in colors]):
-                    colors = np.array(colors).astype('float')
-                    if description == 'sRGB':
+                    colors = np.array(colors).astype("float")
+                    if description == "sRGB":
                         colors /= 255
                 elif all([all([isinstance(c, float) for c in cc]) and len(cc) == 3 for cc in colors]):
                     colors = np.array(colors)
                 else:
-                    raise Exception('bad colors list')
-            elif isinstance(colors[0], str) and description == 'sRGB':
+                    raise Exception("bad colors list")
+            elif isinstance(colors[0], str) and description == "sRGB":
                 colors_srgb = []
                 for color in colors:
-                    if color.startswith('#'):
+                    if color.startswith("#"):
                         if len(color) == 7:
-                            colors_srgb.append([int(color[i:i + 2], 16) / 255 for i in (1, 3, 5)])
+                            colors_srgb.append([int(color[i : i + 2], 16) / 255 for i in (1, 3, 5)])
                         elif len(color) == 4:
                             colors_srgb.append([16 * int(h, 16) / 255 for h in color[1:]])
                     elif color in COLORS:
                         colors_srgb.append(COLORS[color])
                     else:
-                        raise Exception('bad colors list')
-                colors = np.array(colors_srgb).astype('float') / 255
+                        raise Exception("bad colors list")
+                colors = np.array(colors_srgb).astype("float") / 255
             else:
-                raise Exception('bad colors list')
+                raise Exception("bad colors list")
         else:
-            raise Exception('bad colors list')
+            raise Exception("bad colors list")
 
         colors = np.transpose(colors)
-        if description == 'sRGB':
+        if description == "sRGB":
             xyz = srgb.to_xyz100(srgb.from_srgb1(colors))
-        elif description == 'CIELAB':
+        elif description == "CIELAB":
             xyz = CIELAB().to_xyz100(colors)
-        elif description == 'CIELUV':
+        elif description == "CIELUV":
             xyz = CIELUV().to_xyz100(colors)
-        elif description == 'CIELCH':
+        elif description == "CIELCH":
             xyz = CIELCH().to_xyz100(colors)
-        elif description == 'XYZ':
+        elif description == "XYZ":
             xyz = colors
-        elif description[0] in 'JQ' and description[1] in 'CMs' and description[2] in 'Hh':
+        elif description[0] in "JQ" and description[1] in "CMs" and description[2] in "Hh":
             xyz = cam16.to_xyz100(colors, description)
-        elif description in ['CAM16UCS', 'CAM16-UCS']:
+        elif description in ["CAM16UCS", "CAM16-UCS"]:
             xyz = cam16ucs.to_xyz100(colors)
 
         self._xyz = xyz
@@ -343,28 +342,28 @@ class Colors:
         return self._colors[6]
 
     _dims = {
-        'lightness': ('J', 0, 0),
-        'brightness': ('Q', 6, 0),
-        'chroma': ('C', 1, 1),
-        'colorfulness': ('M', 4, 1),
-        'saturation': ('s', 5, 1),
-        'hue quadrature': ('H', 2, 2),
-        'hue': ('h', 3, 2),
+        "lightness": ("J", 0, 0),
+        "brightness": ("Q", 6, 0),
+        "chroma": ("C", 1, 1),
+        "colorfulness": ("M", 4, 1),
+        "saturation": ("s", 5, 1),
+        "hue quadrature": ("H", 2, 2),
+        "hue": ("h", 3, 2),
     }
 
     _dims_ltr = {  # {_dims[d][0]: _dims[d][1:]+(d,) for d in _dims}
-        'J': (0, 0, 'lightness'),
-        'Q': (6, 0, 'brightness'),
-        'C': (1, 1, 'chroma'),
-        'M': (4, 1, 'colorfulness'),
-        's': (5, 1, 'saturation'),
-        'H': (2, 2, 'hue quadrature'),
-        'h': (3, 2, 'hue')
+        "J": (0, 0, "lightness"),
+        "Q": (6, 0, "brightness"),
+        "C": (1, 1, "chroma"),
+        "M": (4, 1, "colorfulness"),
+        "s": (5, 1, "saturation"),
+        "H": (2, 2, "hue quadrature"),
+        "h": (3, 2, "hue"),
     }
 
     def _select_dims(self, ds):
         # J, C, H, h, M, s, Q
-        if isinstance(ds, str) and len(ds) == 3 and ds[0] in 'JQ' and ds[1] in 'CMs' and ds[2] in 'Hh':
+        if isinstance(ds, str) and len(ds) == 3 and ds[0] in "JQ" and ds[1] in "CMs" and ds[2] in "Hh":
             return ds
 
         dims = Colors._dims
@@ -385,12 +384,11 @@ class Colors:
                 dim_n = dims_ltr[ltr][0]
                 dstr[dim_n] = ltr
 
-        self._dimensions = ''.join(dstr)
+        self._dimensions = "".join(dstr)
         return dstr
 
-
     def set_dimension(self, dimension, value, preserve=None):
-        if len(dimension) == '1':
+        if len(dimension) == "1":
             dim = Colors._dims_ltr[ltr][0]
         else:
             dim = Colors._dims[dimension][1]
@@ -399,15 +397,15 @@ class Colors:
             self._select_dims(preserve)
         self._select_dims(dimension)
 
-
     def get_something(self):
         srgb = self._srgb
         colors = self._colors
         length = len(colors)
-        srgb_colors = srgb.to_srgb1(srgb.from_xyz100(cam16.to_xyz100(im.reshape((length, 3)).T, self._dimensions))).T # JCh
+        srgb_colors = srgb.to_srgb1(
+            srgb.from_xyz100(cam16.to_xyz100(im.reshape((length, 3)).T, self._dimensions))
+        ).T  # JCh
         self._srgb_colors = srgb_colors.clip(0, 1, srgb_colors)
         return srgb_colors
-
 
     # J, C, H, h, M, s, Q = cam16.from_xyz100(xyz)
     # JQ CMs Hh
@@ -431,7 +429,9 @@ class OurImage(Image):
         texture = self._coreimage.texture
         self.reference_size = texture.size
         self.texture = texture
-        image = np.fromstring(self.texture.pixels, dtype='ubyte').reshape(*texture.size, 4)[..., :3].astype('float') / 255
+        image = (
+            np.fromstring(self.texture.pixels, dtype="ubyte").reshape(*texture.size, 4)[..., :3].astype("float") / 255
+        )
         self._image = image
         width, height = texture.size
         # self.imc16 = cam16.from_xyz100(srgb.to_xyz100(srgb.from_srgb1(image.reshape((image.shape[0] * image.shape[1], 3)).T)))[[True, True,False,True,False,False,False]].T.reshape(image.shape)
@@ -444,20 +444,23 @@ class OurImage(Image):
         return self._image.copy()
 
     def _set_image(self, image):
-        #print('on_image ' * 30)
-        buf = (image * 255).flatten().astype('ubyte')
-        self.texture.blit_buffer(buf, colorfmt='rgb', bufferfmt='ubyte')
+        # print('on_image ' * 30)
+        buf = (image * 255).flatten().astype("ubyte")
+        self.texture.blit_buffer(buf, colorfmt="rgb", bufferfmt="ubyte")
 
     image = AliasProperty(_get_image, _set_image)
 
     def set_image(self, image):
         # print('on_image ' * 30)
-        buf = (image * 255).flatten().astype('ubyte')
-        self.texture.blit_buffer(buf, colorfmt='rgb', bufferfmt='ubyte')
+        buf = (image * 255).flatten().astype("ubyte")
+        self.texture.blit_buffer(buf, colorfmt="rgb", bufferfmt="ubyte")
 
-    def set_imc16(self, im, descr='JCh'):
-        image_sr = srgb.to_srgb1(srgb.from_xyz100(cam16.to_xyz100(im.reshape((self.image.shape[0] * self.image.shape[1], 3)).T, descr))).T # JCh
+    def set_imc16(self, im, descr="JCh"):
+        image_sr = srgb.to_srgb1(
+            srgb.from_xyz100(cam16.to_xyz100(im.reshape((self.image.shape[0] * self.image.shape[1], 3)).T, descr))
+        ).T  # JCh
         self.set_image(image_sr.clip(0, 1))
+
 
 # Vector libs:
 #   https://github.com/exyte/Macaw/wiki/Getting-started + https://blog.exyte.com/replicating-apple-design-awarded-applications-70e5df4c4b94
@@ -480,44 +483,41 @@ class OurImage(Image):
 # }
 
 
-    # def __init__(self, *args, **kwargs):
-    #     corner = None
-    #     size = None
-    #     if args and isinstance(args[0], Iterable):
-    #         corner = args[0]
-    #     if len(args) > 1 and isinstance(args[1], Iterable):
-    #         size = args[1]
-    #     if len(args) in [3, 4] and all([isinstance(a, Number) for a in args]):
-    #         corner = args[:2]
-    #         size = args[2:]
-    #         if len(size) == 1:
-    #             size *= 2
-    #     if size is None:
-    #         size = kwargs.pop('size', None)
-    #         if isinstance(size, Number):
-    #             size = size, size
-    #         if size is None and ('width' in kwargs or 'height' in kwargs):
-    #             size = kwargs.pop('width', 50), kwargs.pop('height', 50)
-    #     if corner is None:
-    #         corner = kwargs.pop('corner', None)
-    #         if corner is None:
-    #             if 'x' in kwargs or 'y' in kwargs:
-    #                 corner = kwargs.pop('x', 0), kwargs.pop('y', 0)
-    #             elif size and 'center' in kwargs:
-    #                 corner = Vector(kwargs.pop('center')) - Vector(size) / 2
-    #             # elif size and ('center_x' in kwargs or 'center_y' in kwargs):
-    #             #     corner = Vector(kwargs.get('center_x', 0), kwargs.get('center_y', 0)) - size / 2
-    #     if corner and size is None and 'to' in kwargs:
-    #         size = Vector(kwargs.pop('to')) - corner
+# def __init__(self, *args, **kwargs):
+#     corner = None
+#     size = None
+#     if args and isinstance(args[0], Iterable):
+#         corner = args[0]
+#     if len(args) > 1 and isinstance(args[1], Iterable):
+#         size = args[1]
+#     if len(args) in [3, 4] and all([isinstance(a, Number) for a in args]):
+#         corner = args[:2]
+#         size = args[2:]
+#         if len(size) == 1:
+#             size *= 2
+#     if size is None:
+#         size = kwargs.pop('size', None)
+#         if isinstance(size, Number):
+#             size = size, size
+#         if size is None and ('width' in kwargs or 'height' in kwargs):
+#             size = kwargs.pop('width', 50), kwargs.pop('height', 50)
+#     if corner is None:
+#         corner = kwargs.pop('corner', None)
+#         if corner is None:
+#             if 'x' in kwargs or 'y' in kwargs:
+#                 corner = kwargs.pop('x', 0), kwargs.pop('y', 0)
+#             elif size and 'center' in kwargs:
+#                 corner = Vector(kwargs.pop('center')) - Vector(size) / 2
+#             # elif size and ('center_x' in kwargs or 'center_y' in kwargs):
+#             #     corner = Vector(kwargs.get('center_x', 0), kwargs.get('center_y', 0)) - size / 2
+#     if corner and size is None and 'to' in kwargs:
+#         size = Vector(kwargs.pop('to')) - corner
 
-    #     if kwargs:
-    #         raise Exception(f'Bad arguments: {", ".join(kwargs)}')
+#     if kwargs:
+#         raise Exception(f'Bad arguments: {", ".join(kwargs)}')
 
-    #     self.corner = Vector(corner or (0, 0))
-    #     self.size = Vector(size or (50, 50))
-
-
-
+#     self.corner = Vector(corner or (0, 0))
+#     self.size = Vector(size or (50, 50))
 
 
 class Sprite(Scatter):
@@ -525,50 +525,54 @@ class Sprite(Scatter):
     _instances = WeakSet()
 
     _shapes = {
-        "arrow": {
-            'type': 'polygon',
-            'points': [(-10, 0), (10, 0), (0, 10)]
-        },
+        "arrow": {"type": "polygon", "points": [(-10, 0), (10, 0), (0, 10)]},
         "turtle": {
-            'type': 'polygon',
-            'points': [(0, 16), (-2, 14), (-1, 10), (-4, 7), (-7, 9), (-9, 8),
-                       (-6, 5), (-7, 1), (-5, -3), (-8, -6), (-6, -8),
-                       (-4, -5), (0, -7), (4, -5), (6, -8), (8, -6), (5, -3),
-                       (7, 1), (6, 5), (9, 8), (7, 9), (4, 7), (1, 10),
-                       (2, 14)]
+            "type": "polygon",
+            "points": [
+                (0, 16),
+                (-2, 14),
+                (-1, 10),
+                (-4, 7),
+                (-7, 9),
+                (-9, 8),
+                (-6, 5),
+                (-7, 1),
+                (-5, -3),
+                (-8, -6),
+                (-6, -8),
+                (-4, -5),
+                (0, -7),
+                (4, -5),
+                (6, -8),
+                (8, -6),
+                (5, -3),
+                (7, 1),
+                (6, 5),
+                (9, 8),
+                (7, 9),
+                (4, 7),
+                (1, 10),
+                (2, 14),
+            ],
         },
-        "circle": {
-            'type': 'circle',
-            'radius': 25
-        },
-        "square": {
-            'type': 'polygon',
-            'points': [(10, -10), (10, 10), (-10, 10), (-10, -10)]
-        },
-        "platform": {
-            'type': 'polygon',
-            'points': [(-10, -50), (10, -50), (10, 50), (-10, 50)]
-        },
-        "triangle": {
-            'type': 'polygon',
-            'points': [(10, -5.77), (0, 11.55), (-10, -5.77)]
-        },
-        "classic": {
-            'type': 'polygon',
-            'points': [(0, 0), (-5, -9), (0, -7), (5, -9)]
-        }
+        "circle": {"type": "circle", "radius": 25},
+        "square": {"type": "polygon", "points": [(10, -10), (10, 10), (-10, 10), (-10, -10)]},
+        "platform": {"type": "polygon", "points": [(-10, -50), (10, -50), (10, 50), (-10, 50)]},
+        "triangle": {"type": "polygon", "points": [(10, -5.77), (0, 11.55), (-10, -5.77)]},
+        "classic": {"type": "polygon", "points": [(0, 0), (-5, -9), (0, -7), (5, -9)]},
     }
 
     # space = ObjectProperty(None)
 
-    def __init__(self, source, x=0, y=0, scale=1, rotation=0, color='old lace', trace=True,
-                 body_type=Body.KINEMATIC, **kwargs):
+    def __init__(
+        self, source, x=0, y=0, scale=1, rotation=0, color="old lace", trace=True, body_type=Body.KINEMATIC, **kwargs
+    ):
         super(Sprite, self).__init__()
 
         self.body = pymunk.Body(body_type=body_type)
-        density = kwargs.get('density', 0.4)
-        friction = kwargs.get('friction', 1.0)
-        elasticity = kwargs.get('elasticity', 1.0)
+        density = kwargs.get("density", 0.4)
+        friction = kwargs.get("friction", 1.0)
+        elasticity = kwargs.get("elasticity", 1.0)
         self.space = None
         self.source = source
         self.bottom_left = Vector(0, 0)
@@ -576,10 +580,8 @@ class Sprite(Scatter):
         self.image = None
         self.is_moved = False
         if source not in Sprite._shapes:
-            self._type = 'image'
-            imag = Image(
-                source=source, keep_data=trace,
-                anim_delay=kwargs.get('anim_delay', 0.05))
+            self._type = "image"
+            imag = Image(source=source, keep_data=trace, anim_delay=kwargs.get("anim_delay", 0.05))
             self.add_widget(imag)
             imag.size = imag.texture_size
             self.size = imag.texture_size
@@ -587,12 +589,11 @@ class Sprite(Scatter):
             self.pymunk_shapes = []
 
             lines = trace_image(imag._coreimage, cache=False) if trace else []
-            print('lines:', len(lines))
+            print("lines:", len(lines))
             if len(lines) > 1:
-                raise Exception('cannot add fragmented image')
+                raise Exception("cannot add fragmented image")
             if not lines:
-                lines = [[(0, 0), (0, imag.size[1]),
-                          imag.size, (imag.size[0], 0), (0, 0)]]
+                lines = [[(0, 0), (0, imag.size[1]), imag.size, (imag.size[0], 0), (0, 0)]]
             self.contour = lines[0] if lines else []
             with self.canvas:
                 for line in lines:
@@ -618,24 +619,24 @@ class Sprite(Scatter):
             # print('------------')
         else:  # Polygon shape
             shape = Sprite._shapes[source]
-            self._type = shape['type']
+            self._type = shape["type"]
             self.shapes = []
             self.pymunk_shapes = []
 
-            if shape['type'] == 'polygon':
-                self.contour = shape['points']
+            if shape["type"] == "polygon":
+                self.contour = shape["points"]
                 self.contour.append(self.contour[0])
                 # print('contour', self.contour)
-                xs, ys = tuple(zip(*shape['points']))
+                xs, ys = tuple(zip(*shape["points"]))
                 min_x = min(xs)
                 min_y = min(ys)
                 self.size = (max(xs) - min_x, max(ys) - min_y)
                 self.bottom_left = Vector(min_x, min_y)
 
                 tess = Tesselator()
-                tess.add_contour([
-                    coord for point in shape['points'] for coord in point
-                ])  # (point[0]+x,point[1]+y)]) #shape['points'])
+                tess.add_contour(
+                    [coord for point in shape["points"] for coord in point]
+                )  # (point[0]+x,point[1]+y)]) #shape['points'])
                 tess.tesselate(WINDING_ODD, TYPE_POLYGONS)
                 with self.canvas:
                     PushMatrix()
@@ -646,11 +647,7 @@ class Sprite(Scatter):
                         Color(*color)
                     for vertices, indices in tess.meshes:
                         # offset_vs = [v - (min_x, min_y)[i % 2] for i, v in enumerate(vertices)]
-                        self.shapes.append(
-                            Mesh(
-                                vertices=vertices,
-                                indices=indices,
-                                mode="triangle_fan"))
+                        self.shapes.append(Mesh(vertices=vertices, indices=indices, mode="triangle_fan"))
 
                         vs = list(zip(vertices[::4], vertices[1::4]))
                         poly = pymunk.Poly(self.body, vs)
@@ -661,8 +658,8 @@ class Sprite(Scatter):
                         self.pymunk_shapes.append(poly)
                     PopMatrix()
 
-            elif shape['type'] == 'circle':
-                r = shape['radius']
+            elif shape["type"] == "circle":
+                r = shape["radius"]
                 self.contour = [(-r, -r), (-r, r), (r, r), (r, -r), (-r, -r)]
                 self.size = (2 * r, 2 * r)
                 self.bottom_left = Vector(-r, -r)
@@ -671,11 +668,9 @@ class Sprite(Scatter):
                         Color(*(COLORS.get(color) or (1, 0, 0)))
                     else:
                         Color(*color)
-                    self.shapes.append(
-                        Ellipse(pos=(0, 0), size=(r * 2, r * 2)))
+                    self.shapes.append(Ellipse(pos=(0, 0), size=(r * 2, r * 2)))
                     Color(0, 0, 0)
-                    self.shapes.append(
-                        Line(points=[r, r, 2 * r, r], width=2))
+                    self.shapes.append(Line(points=[r, r, 2 * r, r], width=2))
                     cir = pymunk.Circle(self.body, r, (0, 0))
                     if body_type == Body.DYNAMIC:
                         cir.density = density
@@ -683,7 +678,7 @@ class Sprite(Scatter):
                     cir.elasticity = elasticity
                     self.pymunk_shapes.append(cir)
             else:
-                raise Exception('unkown shape type')
+                raise Exception("unkown shape type")
 
         self.position = x, y
         self.rotation = rotation
@@ -694,7 +689,6 @@ class Sprite(Scatter):
 
     def apply_impulse(self, force, point=(0, 0)):
         self.body.apply_impulse_at_local_point(force, point)
-
 
     @property
     def velocity(self):
@@ -745,8 +739,8 @@ class Sprite(Scatter):
         # print('On position', position)
         # self.position = position
         # if self._selection_line:
-            # contour = [(p[0] + self.position[0], p[1] + self.position[1]) for p in self.contour]
-            # self._selection_line.points = contour
+        # contour = [(p[0] + self.position[0], p[1] + self.position[1]) for p in self.contour]
+        # self._selection_line.points = contour
 
         # print('ON POS', self.space, self.space and self.space.shapes, self.pymunk_shapes)
         # self.body.position = position # self.to_parent(*pos)
@@ -794,7 +788,7 @@ class Sprite(Scatter):
 
     def on_touch_down(self, touch):
         # if not self.collide_point(touch.x, touch.y):
-            # return False
+        # return False
         # if repr(self) in touch.ud:
         #     return False
         # touch.grab(self)
@@ -803,7 +797,7 @@ class Sprite(Scatter):
 
         # return super(Sprite, self).on_touch_down(touch)
         if self.collide_point(touch.x, touch.y):
-            print('touch', touch, touch.dpos, (touch.ox, touch.oy), touch.pos, touch.ppos)
+            print("touch", touch, touch.dpos, (touch.ox, touch.oy), touch.pos, touch.ppos)
             touch.grab(self)
             self.is_moved = True
             self.body.velocity = 0, 0
@@ -812,14 +806,12 @@ class Sprite(Scatter):
                 self.canvas.remove(self._selection_line)
                 self._selection_line = None
             else:
-                with self.canvas: #.after:
+                with self.canvas:  # .after:
                     Color(0.2, 0.3, 1)
-                    x, y = -self.bottom_left #self.position  # self.bottom_left
-                    print('source:', self.source)
+                    x, y = -self.bottom_left  # self.position  # self.bottom_left
+                    print("source:", self.source)
                     contour = [(p[0] + x, p[1] + y) for p in self.contour]
-                    self._selection_line = Line(
-                        points=contour, dash_offset=5,
-                        dash_length=10, width=1.5)
+                    self._selection_line = Line(points=contour, dash_offset=5, dash_length=10, width=1.5)
             return super(Sprite, self).on_touch_down(touch)
         else:
             return False
@@ -854,7 +846,8 @@ class Sprite(Scatter):
         t = pos - _pos
         trans = Matrix().translate(t.x, t.y, 0)
         self.apply_transform(trans)
-    position = AliasProperty(_get_position, _set_position, bind=('bbox', ))
+
+    position = AliasProperty(_get_position, _set_position, bind=("bbox",))
 
     def _get_xcor(self):
         if self.body:
@@ -863,7 +856,8 @@ class Sprite(Scatter):
 
     def _set_xcor(self, x):
         self._set_x(x - self.offset.x)
-    xcor = AliasProperty(_get_xcor, _set_xcor, bind=('bbox', ))
+
+    xcor = AliasProperty(_get_xcor, _set_xcor, bind=("bbox",))
 
     def _get_ycor(self):
         if self.body:
@@ -872,7 +866,8 @@ class Sprite(Scatter):
 
     def _set_ycor(self, y):
         self._set_y(y - self.offset.y)
-    ycor = AliasProperty(_get_ycor, _set_ycor, bind=('bbox', ))
+
+    ycor = AliasProperty(_get_ycor, _set_ycor, bind=("bbox",))
 
     def _get_bbox(self):
         # FIXME: self.size?
@@ -890,8 +885,8 @@ class Sprite(Scatter):
                     ymax = y
             return Vector(xmin, ymin), Vector(xmax - xmin, ymax - ymin)
         return super(Sprite, self).bbox
-    bbox = AliasProperty(_get_bbox, None, bind=(
-        'transform', 'width', 'height'))
+
+    bbox = AliasProperty(_get_bbox, None, bind=("transform", "width", "height"))
 
     def _get_center(self):
         return super(Sprite, self)._get_center
@@ -904,7 +899,8 @@ class Sprite(Scatter):
         self.apply_transform(trans)
         if body:
             self.body.position += t
-    center = AliasProperty(_get_center, _set_center, bind=('bbox', ))
+
+    center = AliasProperty(_get_center, _set_center, bind=("bbox",))
 
     def _set_pos(self, pos):
         self._set_position(Vector(pos) + self.offset)
@@ -912,7 +908,8 @@ class Sprite(Scatter):
     def _get_pos(self):
         if self.body:
             return self.body.position - self.offset
-    pos = AliasProperty(_get_pos, _set_pos, bind=('bbox', ))
+
+    pos = AliasProperty(_get_pos, _set_pos, bind=("bbox",))
 
     def _get_x(self):
         if self.body:
@@ -927,7 +924,8 @@ class Sprite(Scatter):
                 if self.space.replay_mode:
                     return
         super(Sprite, self)._set_x(x)
-    x = AliasProperty(_get_x, _set_x, bind=('bbox', ))
+
+    x = AliasProperty(_get_x, _set_x, bind=("bbox",))
 
     def _get_y(self):
         if self.body:
@@ -942,7 +940,8 @@ class Sprite(Scatter):
                 if self.space.replay_mode:
                     return
         super(Sprite, self)._set_y(y)
-    y = AliasProperty(_get_y, _set_y, bind=('bbox', ))
+
+    y = AliasProperty(_get_y, _set_y, bind=("bbox",))
 
     def _register(self):
         Sprite._instances.add(self)
@@ -978,16 +977,14 @@ class Sprite(Scatter):
             angle_change = self.rotation - rotation
             if angle_change != 0:
                 r = Matrix().rotate(-radians(angle_change), 0, 0, 1)
-                self.apply_transform(r, post_multiply=True,
-                                     anchor=-self.bottom_left)
+                self.apply_transform(r, post_multiply=True, anchor=-self.bottom_left)
         if self.body:
             self.body.angle = radians(rotation)
             self.body.position = self.position
             if self.space:
                 self.space.reindex_shapes_for_body(self.body)
 
-    rotation = AliasProperty(_get_rotation, _set_rotation, bind=(
-        'x', 'y', 'transform'))
+    rotation = AliasProperty(_get_rotation, _set_rotation, bind=("x", "y", "transform"))
 
     def _update(self):
         if self.is_moved:
@@ -1004,8 +1001,7 @@ class Sprite(Scatter):
             angle_change = _rotation - rotation
             if angle_change != 0.0:
                 r = Matrix().rotate(-radians(angle_change), 0, 0, 1)
-                self.apply_transform(r, post_multiply=True,
-                                     anchor=-self.body.center_of_gravity)
+                self.apply_transform(r, post_multiply=True, anchor=-self.body.center_of_gravity)
             pos = Vector(self.body.position)
             _pos = self.to_parent(*-self.bottom_left)
             if pos == _pos:
@@ -1019,12 +1015,6 @@ class Sprite(Scatter):
         for sprite in Sprite._instances:
             if sprite.body.body_type != Body.STATIC and (not ignore_sleeping or not sprite.body.is_sleeping):
                 sprite._update()
-
-
-
-
-
-
 
         # for shape in self.sandbox.space.shapes:
         #     if hasattr(shape, "kivy") and not shape.body.is_sleeping:
