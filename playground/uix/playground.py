@@ -231,14 +231,14 @@ class Playground(FloatLayout):
 
         # FIXME
         vs1 = VarSlider(var_name="a", min=0, max=360, type="float")
-        # vs2 = VarSlider(var_name='b', type='float')
-        # vs3 = VarSlider(var_name='c', type='float')
+        vs2 = VarSlider(var_name='b', min=0, max=360, type='float')
+        vs3 = VarSlider(var_name='c', min=0, max=360, type='float')
         # vs4 = VarSlider(var_name='l', min=0, max=50)
         # vs5 = VarSlider(var_name='m', min=0, max=100)
         # vs6 = VarSlider(var_name='n', min=0, max=150)
         self.rpanel.add_widget(vs1, 1)
-        # self.rpanel.add_widget(vs2, 1)
-        # self.rpanel.add_widget(vs3, 1)
+        self.rpanel.add_widget(vs2, 1)
+        self.rpanel.add_widget(vs3, 1)
         # self.rpanel.add_widget(vs4, 1)
         # self.rpanel.add_widget(vs5, 1)
         # self.rpanel.add_widget(vs6, 1)
@@ -279,14 +279,14 @@ class Playground(FloatLayout):
 
         # FIXME
         vs1.bind(value=_set_var)
-        # vs2.bind(value=_set_var)
-        # vs3.bind(value=_set_var)
+        vs2.bind(value=_set_var)
+        vs3.bind(value=_set_var)
         # vs4.bind(value=_set_var)
         # vs5.bind(value=_set_var)
         # vs6.bind(value=_set_var)
         vs1.value = 36.0
-        # vs2.value = 3.4
-        # vs3.value = 4.2
+        vs2.value = 72.0
+        vs3.value = 108.0
         # vs4.value = 15
         # vs5.value = 50
         # vs6.value = 75
@@ -477,7 +477,7 @@ class Playground(FloatLayout):
                             )
                             self.sandbox.images[source] = image_stroke
                             # self.sandbox.images[shape.fill.source] = image
-                            image.bind(texture=update_texture)  # TODO: Animation
+                            # image.bind(texture=update_texture)  # TODO: Animation
                             # TODO: If not exists (image_stroke.texture is None)...
                         texture_stroke = image_stroke.texture
                         tex_coords_stroke = texture_stroke.tex_coords
@@ -714,7 +714,7 @@ class Playground(FloatLayout):
                 for shape in shapes:  # chain(shapes.get(oid, ()) for oid in oids):
                     for context, instructions in shape:
                         for inst in instructions:
-                            context.remove(inst)
+                            context.remove(inst)  # FIXME: May hang there when removing objects in editor
 
             to_remove = old_shapes - set([shape for shape in self.sandbox.shapes_by_id.values()])
 

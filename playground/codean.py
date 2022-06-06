@@ -301,7 +301,7 @@ class CodeRunner:
         new_ast = {}
         for i, node in enumerate(tree.body):
             if isinstance(node, ast.FunctionDef) and node.name in self._special_funcs:
-                new_ast[node.name] = ast.Module(body=[node])
+                new_ast[node.name] = ast.Module(body=[node], type_ignores=[])
                 if not compare_ast(self._ast.get(node.name, None), new_ast[node.name]):
                     changed.append(node.name)
             else:

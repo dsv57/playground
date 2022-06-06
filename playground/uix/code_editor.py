@@ -166,7 +166,7 @@ class CodeEditor(CodeInput, FocusBehavior):
 
     def _auto_indent(self, substring):
         index = self.cursor_index()
-        _text = self._get_text(encode=False)
+        _text = self._get_text() # (encode=False)
         if index > 0:
             line_start = _text.rfind("\n", 0, index)
             if line_start > -1:
@@ -194,7 +194,7 @@ class CodeEditor(CodeInput, FocusBehavior):
             self._set_line_text(cr, new_text)
             self.cursor = self.get_cursor_from_index(cursor_index - remove)
             # handle undo and redo
-            self._set_undo_redo_bkspc(cursor_index, cursor_index - remove, substring, from_undo)
+            self._set_unredo_bkspc(cursor_index, cursor_index - remove, substring, from_undo)
             return
         super(CodeEditor, self).do_backspace(from_undo, mode)
 

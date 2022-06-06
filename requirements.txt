@@ -1,6 +1,7 @@
- kivy
- noise
- PyOpenGL
- pymunk
- scipy
- astor
+kivy
+noise
+PyOpenGL
+pymunk
+scipy
+astor
+jedi
