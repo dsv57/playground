@@ -1,17 +1,15 @@
 from numbers import Number
 from collections import defaultdict
-from collections.abc import Iterable, Mapping
-from weakref import WeakValueDictionary
-from itertools import chain
+from collections.abc import Iterable
 import inspect
 
 from pymunk import Body
 
 # from pymunk import Transform as PymunkTransform
 
-from playground.utils import KeepRefs, SetterProperty, OurList
+from playground.utils import KeepRefs, SetterProperty
 from playground.color import Color
-from playground.geometry import Vector, VectorRef, VectorRefProperty, VectorList, Transform
+from playground.geometry import Vector, VectorRefProperty, VectorList, Transform
 
 
 __all__ = ["Stroke", "Shape", "Rectangle", "Circle", "Line", "Image", "Physics"]
@@ -246,7 +244,6 @@ class Shape(KeepRefs):
         trace = []
         if Shape.trace:
             f = inspect.currentframe()
-            tb = []
             depth = 0
             while f is not None:
                 filename = f.f_code.co_filename

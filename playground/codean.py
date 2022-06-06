@@ -3,21 +3,18 @@
 
 import ast
 import linecache
-from traceback import TracebackException, FrameSummary
 from io import StringIO
-from sys import getsizeof, exc_info  # , modules
+from sys import getsizeof
 from copy import deepcopy
 from collections import defaultdict
 from contextlib import redirect_stdout, redirect_stderr
 
 import jedi
 
-_MAX_VAR_SIZE = 4096
+MAX_VAR_SIZE = 4096
 jedi.settings.add_bracket_after_function = True
 jedi.settings.case_insensitive_completion = False
 jedi.preload_module("ourturtle")
-
-from astor import dump_tree, to_source
 
 
 def autocomp(src, namespace, lineno, column):

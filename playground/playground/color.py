@@ -1,13 +1,12 @@
 from collections import defaultdict
 from functools import lru_cache
-from copy import copy, deepcopy
-import inspect
+from copy import copy
+# import inspect
 
 import numpy as np
-from numpy import sin, cos, arctan2 as atan2, sqrt, ceil, floor, degrees, radians, log, pi, exp, transpose
-from numpy.polynomial import polynomial
+from numpy import sqrt
 from scipy.spatial import KDTree
-from colorio import CIELAB, CAM16UCS, CAM16, JzAzBz, SrgbLinear
+from colorio import CIELAB, CIELUV, CIELCH, CAM16UCS, SrgbLinear
 from colorio.illuminants import whitepoints_cie1931
 
 from named_colors import COLORS
@@ -1549,15 +1548,15 @@ class Color(KeepWeakRefs):
             other._update_cam16()
         return self._color[:2] == other._color[:2] and self._color[3] == other._color[3]
 
-    def __hash__(self):
-        if not (self._color and self._color[0] and (self._color[1] or self._color[5]) and self._color[3]):
-            self._update_cam16()
-        elif self._color[1] is None:
-            cam16 = self._own_cam.cam16
-            J = self._color[0]
-            s = self._color[5]
-            C = self._color[1] = s**2 * sqrt(J) * (cam16.A_w + 4) / 25000 / cam16.c
-        return hash((*self._color[:2], self._color[3]))
+    # def __hash__(self):
+    #     if not (self._color and self._color[0] and (self._color[1] or self._color[5]) and self._color[3]):
+    #         self._update_cam16()
+    #     elif self._color[1] is None:
+    #         cam16 = self._own_cam.cam16
+    #         J = self._color[0]
+    #         s = self._color[5]
+    #         C = self._color[1] = s**2 * sqrt(J) * (cam16.A_w + 4) / 25000 / cam16.c
+    #     return hash((*self._color[:2], self._color[3]))
 
     def __repr__(self):
         name = None
@@ -1748,7 +1747,7 @@ class Color(KeepWeakRefs):
             cam16 = self._own_cam.cam16
             h = self._color[3]
             h_ = (h - cam16.h[0]) % 360 + cam16.h[0]
-            e_t = (cos(radians(h_) + 2) + 3.8) / 4
+            # e_t = (cos(radians(h_) + 2) + 3.8) / 4
             i = np.searchsorted(cam16.h, h_) - 1
             beta = (h_ - cam16.h[i]) * cam16.e[i + 1]
             H = self._color[2] = cam16.H[i] + 100 * beta / (beta + cam16.e[i] * (cam16.h[i + 1] - h_))

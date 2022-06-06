@@ -1,6 +1,5 @@
 import operator
 from math import sin, cos, tan, atan2, radians, degrees, hypot
-from numbers import Number
 from collections.abc import Iterable
 
 
@@ -386,7 +385,7 @@ class Vector(object):
         :return: The cross product
         """
         x2, y2 = _as_tuple(other)
-        return self.x * y2 - self.y * y1
+        return self.x * y2 - self.y * x2
 
     def interpolate_to(self, other, range):
         x2, y2 = _as_tuple(other)
@@ -581,7 +580,7 @@ class VectorRef(Vector):
         x, y = self._fget()
         length = hypot(x, y)
         if length != 0.0:
-            self._fset(x * value / length, y2)
+            self._fset(x * value / length, y * value / length)
         else:
             self._fset(value, 0)
         # UPDATE
@@ -685,7 +684,7 @@ class VectorRef(Vector):
         """
         x, y = self._fget()
         x2, y2 = _as_tuple(other)
-        return x * y2 - y * y1
+        return x * y2 - y * x2
 
     def interpolate_to(self, other, range):
         x, y = self._fget()
