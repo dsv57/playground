@@ -24,7 +24,7 @@ from turtle import TurtleGraphicsError  # Vec2d
 
 from pymunk.vec2d import Vec2d
 
-from named_colors import COLORS
+from .named_colors import COLORS
 
 
 class Turtle:

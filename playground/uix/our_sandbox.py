@@ -3,7 +3,16 @@ from collections import defaultdict
 from kivy.uix.behaviors import FocusBehavior
 from kivy.uix.image import Image
 from kivy.uix.scatter import ScatterPlane
-from kivy.graphics import Color, Rectangle, RenderContext, Mesh, ClearBuffers, ClearColor, Callback, Fbo
+from kivy.graphics import (
+    Color,
+    Rectangle,
+    RenderContext,
+    Mesh,
+    ClearBuffers,
+    ClearColor,
+    Callback,
+    Fbo,
+)
 from kivy.graphics.transformation import Matrix
 from kivy.properties import ObjectProperty
 from kivy.clock import Clock
@@ -11,7 +20,7 @@ from kivy.graphics.opengl import glEnable, glDisable  # glFinish
 from kivy.resources import resource_find, resource_paths
 
 from playground import utils
-from rougier.dash_lines_2D import DashLines
+from playground.rougier.dash_lines_2D import DashLines
 from playground.color import Color as OurColor
 
 
@@ -30,7 +39,9 @@ class OurSandbox(FocusBehavior, ScatterPlane):
     def __init__(self, **kwargs):
         # self.canvas = RenderContext()  # ?
         self.canvas = RenderContext(
-            use_parent_projection=True, use_parent_modelview=True, use_parent_frag_modelview=True
+            use_parent_projection=True,
+            use_parent_modelview=True,
+            use_parent_frag_modelview=True,
         )
 
         with self.canvas.before:
@@ -141,7 +152,9 @@ class OurSandbox(FocusBehavior, ScatterPlane):
     def update_shader(self, *largs):
         # self.canvas['projection_mat'] = Window.render_context['projection_mat']
         for rc in [self.rc1, self.rc2, self.canvas]:  # , self.fbo]: #
-            rc["modelview_mat"] = self.transform  # Window.render_context['modelview_mat']
+            rc[
+                "modelview_mat"
+            ] = self.transform  # Window.render_context['modelview_mat']
             rc["resolution"] = list(map(float, self.size))
             rc["time"] = Clock.get_boottime()
             rc["scale"] = self.transform[0]
@@ -203,11 +216,15 @@ class OurSandbox(FocusBehavior, ScatterPlane):
             b = randint(10, 100)
             w = randint(0, min(a, b) // 2)
             stroke = (
-                *OurColor(random() * 30 + 40, 50, random() * 360, mode="Jsh").linear_srgb,
+                *OurColor(
+                    random() * 30 + 40, 50, random() * 360, mode="Jsh"
+                ).linear_srgb,
                 random(),
             )  # random(), random(), random(), random()
             fill = (
-                *OurColor(random() * 30 + 40, 50, random() * 360, mode="Jsh").linear_srgb,
+                *OurColor(
+                    random() * 30 + 40, 50, random() * 360, mode="Jsh"
+                ).linear_srgb,
                 random(),
             )  # # random(), random(), random(), random()
             a1 = 2 * pi * random()
@@ -244,11 +261,15 @@ class OurSandbox(FocusBehavior, ScatterPlane):
             w = randint(0, min(a, b) // 2)
             r = randint(0, min(a, b) // 2)
             stroke = (
-                *OurColor(random() * 30 + 40, 50, random() * 360, mode="Jsh").linear_srgb,
+                *OurColor(
+                    random() * 30 + 40, 50, random() * 360, mode="Jsh"
+                ).linear_srgb,
                 random(),
             )  # random(), random(), random(), random()
             fill = (
-                *OurColor(random() * 30 + 40, 50, random() * 360, mode="Jsh").linear_srgb,
+                *OurColor(
+                    random() * 30 + 40, 50, random() * 360, mode="Jsh"
+                ).linear_srgb,
                 random(),
             )  # # random(), random(), random(), random()
             v0 = x, y, -a, -b, r, w, *stroke, *fill, *tr
@@ -256,7 +277,14 @@ class OurSandbox(FocusBehavior, ScatterPlane):
             v2 = x, y, +a, +b, r, w, *stroke, *fill, *tr
             v3 = x, y, +a, -b, r, w, *stroke, *fill, *tr
             vertices = v0 + v1 + v2 + v3
-            meshes.append(Mesh(fmt=self.rc2_vfmt, mode="triangle_strip", vertices=vertices, indices=indices))
+            meshes.append(
+                Mesh(
+                    fmt=self.rc2_vfmt,
+                    mode="triangle_strip",
+                    vertices=vertices,
+                    indices=indices,
+                )
+            )
         return meshes
 
     def keyboard_on_key_down(self, window, keycode, text, modifiers):
@@ -276,7 +304,9 @@ class OurSandbox(FocusBehavior, ScatterPlane):
             print("frag_modelview_mat\n", self.canvas["frag_modelview_mat"])
         elif self.dispatch("on_key_down", window, keycode, text, modifiers):
             return True
-        return super(OurSandbox, self).keyboard_on_key_down(window, keycode, text, modifiers)
+        return super(OurSandbox, self).keyboard_on_key_down(
+            window, keycode, text, modifiers
+        )
 
     def on_key_down(self, window, keycode, text, modifiers):
         pass
@@ -305,11 +335,15 @@ class OurSandbox(FocusBehavior, ScatterPlane):
     def on_touch_down(self, touch):
         if touch.is_mouse_scrolling:
             scale = self.scale + (0.05 if touch.button == "scrolldown" else -0.05)
-            if (self.scale_min and scale < self.scale_min) or (self.scale_max and scale > self.scale_max):
+            if (self.scale_min and scale < self.scale_min) or (
+                self.scale_max and scale > self.scale_max
+            ):
                 return
             rescale = scale * 1.0 / self.scale
             self.apply_transform(
-                Matrix().scale(rescale, rescale, rescale), post_multiply=True, anchor=self.to_local(*touch.pos)
+                Matrix().scale(rescale, rescale, rescale),
+                post_multiply=True,
+                anchor=self.to_local(*touch.pos),
             )
             self.update_shader()
             return self.dispatch("on_transform_with_touch", touch)

@@ -7,9 +7,9 @@ from pymunk import Body
 
 # from pymunk import Transform as PymunkTransform
 
-from playground.utils import KeepRefs, SetterProperty
-from playground.color import Color
-from playground.geometry import Vector, VectorRefProperty, VectorList, Transform
+from .utils import KeepRefs, SetterProperty
+from .color import Color
+from .geometry import Vector, VectorRefProperty, VectorList, Transform
 
 
 __all__ = ["Stroke", "Shape", "Rectangle", "Circle", "Line", "Image", "Physics"]
@@ -56,7 +56,9 @@ _linecaps = (
 class Stroke(object):
     # __slots__ = ('fill', 'width', 'cap', 'joint', 'dashes', '_modified')
 
-    def __init__(self, fill="white", width=1.0, caps="round", join="round", dashes=None):
+    def __init__(
+        self, fill="white", width=1.0, caps="round", join="round", dashes=None
+    ):
         self.fill = fill
         self.width = width
         self.caps = caps
@@ -67,7 +69,11 @@ class Stroke(object):
     def __setattr__(self, name, value):
         if name[0] != "_":
             self.__dict__["_modified"] = True
-            if name == "fill" and value is not None and not isinstance(value, (Color, Image)):
+            if (
+                name == "fill"
+                and value is not None
+                and not isinstance(value, (Color, Image))
+            ):
                 value = Color(value)
             elif name == "width":
                 value = float(value)
@@ -77,8 +83,14 @@ class Stroke(object):
                         value = (value, value)
                     else:
                         linecaps = '", "'.join(_linecaps)
-                        raise TypeError(f'Stroke caps must be one of: "{linecaps}" or pair')
-                elif len(value) != 2 or value[0] not in _linecaps or value[1] not in _linecaps:
+                        raise TypeError(
+                            f'Stroke caps must be one of: "{linecaps}" or pair'
+                        )
+                elif (
+                    len(value) != 2
+                    or value[0] not in _linecaps
+                    or value[1] not in _linecaps
+                ):
                     linecaps = '", "'.join(_linecaps)
                     raise TypeError(f'Stroke caps must be one of: "{linecaps}" or pair')
             elif name == "join":
@@ -116,7 +128,11 @@ class Stroke(object):
         return hash(tuple(self))
 
 
-_body_type = {"static": Body.STATIC, "kinematic": Body.KINEMATIC, "dynamic": Body.DYNAMIC}
+_body_type = {
+    "static": Body.STATIC,
+    "kinematic": Body.KINEMATIC,
+    "dynamic": Body.DYNAMIC,
+}
 _body_type_str = {t: s for s, t in _body_type.items()}
 
 
@@ -128,7 +144,9 @@ class Physics(object):
     # KINEMATIC = Body.KINEMATIC
     # DYNAMIC = Body.DYNAMIC
 
-    def __init__(self, type="kinematic", density=1.0, elasticity=1.0, friction=1.0, **kwargs):
+    def __init__(
+        self, type="kinematic", density=1.0, elasticity=1.0, friction=1.0, **kwargs
+    ):
         self.density = density
         self.elasticity = elasticity
         self.friction = friction
@@ -151,7 +169,9 @@ class Physics(object):
         return False
 
     def __hash__(self):
-        return hash((self.density, self.elasticity, self.friction, self.body, self._pm_shapes))
+        return hash(
+            (self.density, self.elasticity, self.friction, self.body, self._pm_shapes)
+        )
 
     def __setattr__(self, name, value):
         self.__dict__["_modified"] = True
@@ -165,7 +185,15 @@ class Physics(object):
         elif name == "moment":
             self.body.moment = value
         else:
-            if name not in ("density", "elasticity", "friction", "body", "mass", "type", "moment"):
+            if name not in (
+                "density",
+                "elasticity",
+                "friction",
+                "body",
+                "mass",
+                "type",
+                "moment",
+            ):
                 raise TypeError(f"got an unexpected keyword argument '{name}'")
             for shape in self._pm_shapes:
                 setattr(shape, name, value)
@@ -369,7 +397,9 @@ class Line(Shape):
 
     def __eq__(self, other):
         if isinstance(other, Line):
-            return self.points == other.points and super(Line, self) == super(Line, other)
+            return self.points == other.points and super(Line, self) == super(
+                Line, other
+            )
         return False
 
     # def __hash__(self):
@@ -392,13 +422,23 @@ class Line(Shape):
 
 class Circle(Shape):
     def __init__(
-        self, center=(0, 0), radius=10, stroke=None, fill="white", angle_start=0, angle_end=360, physics=None, **kwargs
+        self,
+        center=(0, 0),
+        radius=10,
+        stroke=None,
+        fill="white",
+        angle_start=0,
+        angle_end=360,
+        physics=None,
+        **kwargs,
     ):
         self._center = Vector(center)
         self.radius = radius
         self.angle_start = angle_start
         self.angle_end = angle_end
-        super(Circle, self).__init__(stroke=stroke, fill=fill, physics=physics, **kwargs)
+        super(Circle, self).__init__(
+            stroke=stroke, fill=fill, physics=physics, **kwargs
+        )
 
     def _is_modified(self, reset=True):
         return super(Circle, self)._is_modified(reset)
@@ -461,7 +501,15 @@ class Circle(Shape):
 
 
 class Rectangle(Shape):
-    def __init__(self, corner=(0, 0), size=(50, 50), radius=0, stroke=None, fill="white", **kwargs):
+    def __init__(
+        self,
+        corner=(0, 0),
+        size=(50, 50),
+        radius=0,
+        stroke=None,
+        fill="white",
+        **kwargs,
+    ):
         self._corner = Vector(corner)
         if isinstance(size, Number):
             size = size, size
@@ -481,7 +529,11 @@ class Rectangle(Shape):
 
     def __eq__(self, other):
         if isinstance(other, Rectangle):
-            return self._corner == other._corner and self._size == other._size and self.radius == other.radius
+            return (
+                self._corner == other._corner
+                and self._size == other._size
+                and self.radius == other.radius
+            )
         return False
 
     # def __hash__(self):

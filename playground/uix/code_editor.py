@@ -14,7 +14,7 @@ from kivy.cache import Cache
 from kivy.core.text.markup import MarkupLabel
 
 
-from codean import autocomp
+from playground.codean import autocomp
 from playground.color import _parse_srgb
 
 

@@ -11,13 +11,29 @@ import pickle
 
 from kivy.uix.scatter import Scatter
 from kivy.uix.image import Image  # as ImageWidget
-from kivy.graphics import Ellipse, Line, Color, Triangle, Quad, Rectangle, Mesh, PushMatrix, PopMatrix
+from kivy.graphics import (
+    Ellipse,
+    Line,
+    Color,
+    Triangle,
+    Quad,
+    Rectangle,
+    Mesh,
+    PushMatrix,
+    PopMatrix,
+)
 from kivy.graphics.tesselator import Tesselator, WINDING_ODD, TYPE_POLYGONS
 from kivy.graphics.context_instructions import Translate
 from kivy.graphics.transformation import Matrix
 
 # from kivy.core.image import Image as CoreImage
-from kivy.properties import StringProperty, NumericProperty, ListProperty, ObjectProperty, AliasProperty
+from kivy.properties import (
+    StringProperty,
+    NumericProperty,
+    ListProperty,
+    ObjectProperty,
+    AliasProperty,
+)
 
 import numpy as np  # OurImage
 
@@ -26,7 +42,7 @@ import pymunk.autogeometry
 from pymunk import Body
 
 # from pymunk.vec2d import Vec2d
-from named_colors import COLORS
+from .named_colors import COLORS
 
 from playground.geometry import Vector
 
@@ -64,7 +80,9 @@ def trace_image(img, threshold=3, simplify_tolerance=0.7, cache=True):
         sample_func = sample_alpha
     else:
         sample_func = sample_black
-    pymunk.autogeometry.march_soft(bb, img.width, img.height, threshold, segment_func, sample_func)
+    pymunk.autogeometry.march_soft(
+        bb, img.width, img.height, threshold, segment_func, sample_func
+    )
 
     lines = []
     for line in line_set:
@@ -112,7 +130,11 @@ def trace_image(img, threshold=3, simplify_tolerance=0.7, cache=True):
 def ellipse_from_circle(shape):
     pos = shape.body.position - (shape.radius, shape.radius) + shape.offset
     e = Ellipse(pos=pos, size=[shape.radius * 2, shape.radius * 2])
-    circle_edge = shape.body.position + shape.offset + Vector(shape.radius, 0).rotated(shape.body.angle)
+    circle_edge = (
+        shape.body.position
+        + shape.offset
+        + Vector(shape.radius, 0).rotated(shape.body.angle)
+    )
     Color(*COLORS["dark slate gray"])  # (.17,.24,.31)
     line = Line(
         points=[
@@ -180,7 +202,9 @@ def draw_pymunk_shape(canvas, shape, color=None):
                 return Quad(points=points_from_poly(shape))
             else:
                 return Mesh(
-                    vertices=vertices_from_poly(shape), indices=range(len(vs)), mode="triangle_fan"
+                    vertices=vertices_from_poly(shape),
+                    indices=range(len(vs)),
+                    mode="triangle_fan",
                 )  # Line(points=self.points_from_poly(shape), width=3)
         elif isinstance(shape, pymunk.constraint.Constraint):
             points = points_from_constraint(shape)
@@ -188,13 +212,14 @@ def draw_pymunk_shape(canvas, shape, color=None):
                 shape.kivy = Line(points=points)
 
 
-from colorio import CAM16UCS, SrgbLinear
-from colorio.illuminants import whitepoints_cie1931
+from .colorio import CAM16UCS, SrgbLinear
+from .colorio.illuminants import whitepoints_cie1931
 
 
 srgb = SrgbLinear()
 cam16ucs = CAM16UCS(0.69, 20, 20, True, whitepoints_cie1931["D65"])
 cam16 = cam16ucs.cam16
+
 
 class OurImage(Image):
 
@@ -206,13 +231,18 @@ class OurImage(Image):
         self.reference_size = texture.size
         self.texture = texture
         image = (
-            np.fromstring(self.texture.pixels, dtype="ubyte").reshape(*texture.size, 4)[..., :3].astype("float") / 255
+            np.fromstring(self.texture.pixels, dtype="ubyte")
+            .reshape(*texture.size, 4)[..., :3]
+            .astype("float")
+            / 255
         )
         self._image = image
         width, height = texture.size
         # self.imc16 = cam16.from_xyz100(srgb.to_xyz100(srgb.from_srgb1(image.reshape((image.shape[0] * image.shape[1], 3)).T)))[[True, True,False,True,False,False,False]].T.reshape(image.shape)
         image_flat_rgb = image.reshape((width * height, 3)).T
-        image_flat_cam16 = cam16.from_xyz100(srgb.to_xyz100(srgb.from_srgb1(image_flat_rgb)))
+        image_flat_cam16 = cam16.from_xyz100(
+            srgb.to_xyz100(srgb.from_srgb1(image_flat_rgb))
+        )
         J, C, H, h, M, s, Q = image_flat_cam16.T.reshape(width, height, 7).T
         self.imc16 = image_flat_cam16.T.reshape(width, height, 7)
 
@@ -233,7 +263,11 @@ class OurImage(Image):
 
     def set_imc16(self, im, descr="JCh"):
         image_sr = srgb.to_srgb1(
-            srgb.from_xyz100(cam16.to_xyz100(im.reshape((self.image.shape[0] * self.image.shape[1], 3)).T, descr))
+            srgb.from_xyz100(
+                cam16.to_xyz100(
+                    im.reshape((self.image.shape[0] * self.image.shape[1], 3)).T, descr
+                )
+            )
         ).T  # JCh
         self.set_image(image_sr.clip(0, 1))
 
@@ -332,16 +366,34 @@ class Sprite(Scatter):
             ],
         },
         "circle": {"type": "circle", "radius": 25},
-        "square": {"type": "polygon", "points": [(10, -10), (10, 10), (-10, 10), (-10, -10)]},
-        "platform": {"type": "polygon", "points": [(-10, -50), (10, -50), (10, 50), (-10, 50)]},
-        "triangle": {"type": "polygon", "points": [(10, -5.77), (0, 11.55), (-10, -5.77)]},
+        "square": {
+            "type": "polygon",
+            "points": [(10, -10), (10, 10), (-10, 10), (-10, -10)],
+        },
+        "platform": {
+            "type": "polygon",
+            "points": [(-10, -50), (10, -50), (10, 50), (-10, 50)],
+        },
+        "triangle": {
+            "type": "polygon",
+            "points": [(10, -5.77), (0, 11.55), (-10, -5.77)],
+        },
         "classic": {"type": "polygon", "points": [(0, 0), (-5, -9), (0, -7), (5, -9)]},
     }
 
     # space = ObjectProperty(None)
 
     def __init__(
-        self, source, x=0, y=0, scale=1, rotation=0, color="old lace", trace=True, body_type=Body.KINEMATIC, **kwargs
+        self,
+        source,
+        x=0,
+        y=0,
+        scale=1,
+        rotation=0,
+        color="old lace",
+        trace=True,
+        body_type=Body.KINEMATIC,
+        **kwargs
     ):
         super(Sprite, self).__init__()
 
@@ -357,7 +409,11 @@ class Sprite(Scatter):
         self.is_moved = False
         if source not in Sprite._shapes:
             self._type = "image"
-            imag = Image(source=source, keep_data=trace, anim_delay=kwargs.get("anim_delay", 0.05))
+            imag = Image(
+                source=source,
+                keep_data=trace,
+                anim_delay=kwargs.get("anim_delay", 0.05),
+            )
             self.add_widget(imag)
             imag.size = imag.texture_size
             self.size = imag.texture_size
@@ -369,7 +425,9 @@ class Sprite(Scatter):
             if len(lines) > 1:
                 raise Exception("cannot add fragmented image")
             if not lines:
-                lines = [[(0, 0), (0, imag.size[1]), imag.size, (imag.size[0], 0), (0, 0)]]
+                lines = [
+                    [(0, 0), (0, imag.size[1]), imag.size, (imag.size[0], 0), (0, 0)]
+                ]
             self.contour = lines[0] if lines else []
             with self.canvas:
                 for line in lines:
@@ -423,7 +481,11 @@ class Sprite(Scatter):
                         Color(*color)
                     for vertices, indices in tess.meshes:
                         # offset_vs = [v - (min_x, min_y)[i % 2] for i, v in enumerate(vertices)]
-                        self.shapes.append(Mesh(vertices=vertices, indices=indices, mode="triangle_fan"))
+                        self.shapes.append(
+                            Mesh(
+                                vertices=vertices, indices=indices, mode="triangle_fan"
+                            )
+                        )
 
                         vs = list(zip(vertices[::4], vertices[1::4]))
                         poly = pymunk.Poly(self.body, vs)
@@ -573,7 +635,9 @@ class Sprite(Scatter):
 
         # return super(Sprite, self).on_touch_down(touch)
         if self.collide_point(touch.x, touch.y):
-            print("touch", touch, touch.dpos, (touch.ox, touch.oy), touch.pos, touch.ppos)
+            print(
+                "touch", touch, touch.dpos, (touch.ox, touch.oy), touch.pos, touch.ppos
+            )
             touch.grab(self)
             self.is_moved = True
             self.body.velocity = 0, 0
@@ -587,7 +651,9 @@ class Sprite(Scatter):
                     x, y = -self.bottom_left  # self.position  # self.bottom_left
                     print("source:", self.source)
                     contour = [(p[0] + x, p[1] + y) for p in self.contour]
-                    self._selection_line = Line(points=contour, dash_offset=5, dash_length=10, width=1.5)
+                    self._selection_line = Line(
+                        points=contour, dash_offset=5, dash_length=10, width=1.5
+                    )
             return super(Sprite, self).on_touch_down(touch)
         else:
             return False
@@ -745,7 +811,12 @@ class Sprite(Scatter):
     def _get_rotation(self):
         if self.body:
             return degrees(self.body.angle)
-        return (360 - (Vector(self.to_parent(0, 10)) - self.to_parent(0, 0)).angle_between((0, 10))) % 360
+        return (
+            360
+            - (Vector(self.to_parent(0, 10)) - self.to_parent(0, 0)).angle_between(
+                (0, 10)
+            )
+        ) % 360
 
     def _set_rotation(self, rotation):
         # TODO: Add is_symmetric optimization
@@ -772,12 +843,19 @@ class Sprite(Scatter):
                 self.space.remove(*self.pymunk_shapes)
                 self.space.remove(self.body)
                 return
-            _rotation = (360 - (Vector(self.to_parent(0, 10)) - self.to_parent(0, 0)).angle_between((0, 10))) % 360
+            _rotation = (
+                360
+                - (Vector(self.to_parent(0, 10)) - self.to_parent(0, 0)).angle_between(
+                    (0, 10)
+                )
+            ) % 360
             rotation = degrees(self.body.angle)
             angle_change = _rotation - rotation
             if angle_change != 0.0:
                 r = Matrix().rotate(-radians(angle_change), 0, 0, 1)
-                self.apply_transform(r, post_multiply=True, anchor=-self.body.center_of_gravity)
+                self.apply_transform(
+                    r, post_multiply=True, anchor=-self.body.center_of_gravity
+                )
             pos = Vector(self.body.position)
             _pos = self.to_parent(*-self.bottom_left)
             if pos == _pos:
@@ -789,7 +867,9 @@ class Sprite(Scatter):
     @staticmethod
     def update_from_pymunk(ignore_sleeping=True):
         for sprite in Sprite._instances:
-            if sprite.body.body_type != Body.STATIC and (not ignore_sleeping or not sprite.body.is_sleeping):
+            if sprite.body.body_type != Body.STATIC and (
+                not ignore_sleeping or not sprite.body.is_sleeping
+            ):
                 sprite._update()
 
         # for shape in self.sandbox.space.shapes:

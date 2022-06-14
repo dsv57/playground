@@ -6,10 +6,10 @@ from copy import copy
 import numpy as np
 from numpy import sqrt
 from scipy.spatial import KDTree
-from colorio import CIELAB, CIELUV, CIELCH, CAM16UCS, SrgbLinear
-from colorio.illuminants import whitepoints_cie1931
+from playground.colorio import CIELAB, CIELUV, CIELCH, CAM16UCS, SrgbLinear
+from playground.colorio.illuminants import whitepoints_cie1931
 
-from named_colors import COLORS
+from playground.named_colors import COLORS
 
 from playground.utils import KeepWeakRefs
 
